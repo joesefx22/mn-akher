@@ -1,3 +1,90 @@
+'use client'
+import React, { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import BookingSlot from '@/components/features/BookingSlot'
+import { useAuth } from '@/app/contexts/AuthContext'
+
+export default function FieldDetails({ params }: { params: { id: string } }) {
+  const [field, setField] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const { user } = useAuth()
+  const router = useRouter()
+  const id = (params as any).id
+
+  useEffect(() => {
+    fetchField()
+  }, [id])
+
+  const fetchField = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/fields/details?id=${id}`, { credentials: 'include' })
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.msg || 'Failed')
+      setField(j.data.field)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleBook = async (slotStart: string) => {
+    if (!user) {
+      router.push(`/login?redirect=/fields/${id}`)
+      return
+    }
+    try {
+      const res = await fetch('/api/bookings/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ fieldId: id, date: slotStart })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.msg || 'Booking failed')
+      if (data.data.payment) {
+        // redirect to payment
+        const payRes = await fetch('/api/payments/create-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ bookingId: data.data.booking.id })
+        })
+        const payData = await payRes.json()
+        if (payRes.ok && payData.data.paymentUrl) {
+          window.location.href = payData.data.paymentUrl
+          return
+        }
+      }
+      alert('تم الحجز بنجاح')
+      fetchField()
+    } catch (err: any) {
+      alert(err.message)
+    }
+  }
+
+  if (loading) return <div>جارٍ التحميل...</div>
+  if (error) return <div>خطأ: {error}</div>
+  if (!field) return <div>الملعب غير موجود</div>
+
+  // a simple set of slots stubbed
+  const slots = [0,1,2,3].map(i => new Date(Date.now() + (i+1)*3600*1000).toISOString())
+
+  return (
+    <div>
+      <h1>{field.name}</h1>
+      <p>{field.description}</p>
+      <h3>الأوقات المتاحة</h3>
+      <div>
+        {slots.map(s => (
+          <BookingSlot key={s} slotStart={s} onBook={() => handleBook(s)} />
+        ))}
+      </div>
+    </div>
+  )
+}
 // الخطأ الشائع: مفيش credentials
 const response = await fetch(`/api/fields/details?id=${fieldId}`)
 // الصح:
