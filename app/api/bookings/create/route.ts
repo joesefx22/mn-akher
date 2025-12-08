@@ -1,5 +1,73 @@
 import { NextRequest } from 'next/server'
 import prisma from '@/lib/prisma'
+import { verifyToken } from '@/lib/auth'
+import { success, fail, unauthorized } from '@/lib/responses'
+import { z } from 'zod'
+
+const schema = z.object({
+  fieldId: z.string().uuid().or(z.string()),
+  date: z.string(),
+  slotId: z.string().optional()
+})
+
+export async function POST(req: NextRequest) {
+  try {
+    const token = req.cookies.get('access')?.value
+    if (!token) return unauthorized()
+
+    const payload = verifyToken(token, 'access')
+    if (!payload) return unauthorized()
+
+    const body = await req.json()
+    const result = schema.safeParse(body)
+    if (!result.success) return fail('Invalid payload', 422)
+
+    const { fieldId, date, slotId } = result.data
+    const userId = (payload as any).id
+
+    // basic availability check (simplified)
+    const dateObj = new Date(date)
+    const existing = await prisma.booking.findFirst({
+      where: { fieldId, date: dateObj, slotStart: dateObj }
+    })
+    if (existing) return fail('Slot already booked', 409)
+
+    // compute deposit (for example 50% if price > 0)
+    const field = await prisma.field.findUnique({ where: { id: fieldId } })
+    if (!field) return fail('Field not found', 404)
+    const deposit = Math.round(field.pricePerHour * 0.5 * 100) / 100
+
+    const booking = await prisma.booking.create({
+      data: {
+        userId,
+        fieldId,
+        date: dateObj,
+        slotStart: dateObj,
+        slotEnd: new Date(dateObj.getTime() + 60 * 60 * 1000), // 1 hr
+        status: 'PENDING'
+      }
+    })
+
+    let payment = null
+    if (deposit > 0) {
+      payment = await prisma.payment.create({
+        data: {
+          bookingId: booking.id,
+          provider: 'mock',
+          amount: deposit,
+          status: 'PENDING'
+        }
+      })
+    }
+
+    return success({ booking, payment })
+  } catch (err) {
+    console.error(err)
+    return fail('Cannot create booking', 500)
+  }
+}
+import { NextRequest } from 'next/server'
+import prisma from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { 
   formatDateToUTC, 
