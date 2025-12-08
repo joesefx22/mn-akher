@@ -1,3 +1,18 @@
+export const generateSlug = (name: string) =>
+  name.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '')
+
+export const formatDate = (d: Date) => d.toISOString().slice(0, 16).replace('T', ' ')
+
+export const catchAsync = (fn: Function) => {
+  return async (...args: any[]) => {
+    try {
+      return await fn(...args)
+    } catch (err) {
+      console.error(err)
+      return Response.json({ ok: false, msg: 'Server error' }, { status: 500 })
+    }
+  }
+}
 import prisma from './prisma'
 
 // Date & Time Helpers
