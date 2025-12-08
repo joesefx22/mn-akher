@@ -1,5 +1,67 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { verifyToken } from './lib/auth'
+
+export function middleware(req: NextRequest) {
+  const url = req.nextUrl.pathname
+  const access = req.cookies.get('access')?.value
+
+  const PUBLIC = [
+    '/',
+    '/login',
+    '/register',
+    '/api/auth/login',
+    '/api/auth/register',
+    '/api/auth/refresh',
+    '/api/fields/list',
+    '/api/fields/details'
+  ]
+
+  if (PUBLIC.some(p => url.startsWith(p))) return NextResponse.next()
+
+  if (!access) {
+    // for pages redirect to login
+    if (!url.startsWith('/api/')) {
+      const redirectUrl = new URL('/login', req.url)
+      redirectUrl.searchParams.set('redirect', req.url)
+      return NextResponse.redirect(redirectUrl)
+    }
+    return NextResponse.json({ ok:false, msg: 'Unauthorized' }, { status: 401 })
+  }
+
+  const payload = verifyToken(access, 'access')
+  if (!payload) {
+    // Attempt to allow API to trigger refresh flow client-side; for pages force login
+    if (!url.startsWith('/api/')) {
+      const redirectUrl = new URL('/login', req.url)
+      redirectUrl.searchParams.set('redirect', req.url)
+      return NextResponse.redirect(redirectUrl)
+    }
+    return NextResponse.json({ ok:false, msg:'Unauthorized' }, { status: 401 })
+  }
+
+  // role-based guards for dashboard
+  if (url.startsWith('/dashboard')) {
+    const role = (payload as any).role?.toLowerCase?.() || ''
+    if (url.includes('/owner') && role !== 'owner') return NextResponse.redirect(new URL('/', req.url))
+    if (url.includes('/admin') && role !== 'admin') return NextResponse.redirect(new URL('/', req.url))
+    if (url.includes('/employee') && role !== 'employee') return NextResponse.redirect(new URL('/', req.url))
+  }
+
+  const res = NextResponse.next()
+  // security headers
+  res.headers.set('X-Content-Type-Options', 'nosniff')
+  res.headers.set('X-Frame-Options', 'SAMEORIGIN')
+  res.headers.set('Referrer-Policy', 'no-referrer')
+  res.headers.set('Access-Control-Allow-Credentials', 'true')
+  return res
+}
+
+export const config = {
+  matcher: ['/dashboard/:path*', '/api/:path*', '/fields/:path*', '/my-bookings']
+}
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 import { verifyToken } from '@/lib/auth'
 
 export function middleware(req: NextRequest) {
