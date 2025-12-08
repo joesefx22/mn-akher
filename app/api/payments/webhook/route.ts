@@ -2,6 +2,62 @@ import { NextRequest } from 'next/server'
 import prisma from '@/lib/prisma'
 import { success, badRequest } from '@/lib/responses'
 
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    
+    // TODO: Add Paymob HMAC verification
+    const { 
+      obj: { 
+        id: transactionId,
+        success: isSuccess,
+        amount_cents,
+        order: { id: orderId }
+      } 
+    } = body
+
+    // 1. Find payment by transaction ID
+    const payment = await prisma.payment.findUnique({
+      where: { providerTxId: transactionId.toString() },
+      include: { booking: true }
+    })
+
+    if (!payment) {
+      console.error('Payment not found:', transactionId)
+      return badRequest('Payment not found')
+    }
+
+    // 2. Verify amount (convert cents to currency)
+    if (payment.amount * 100 !== amount_cents) {
+      console.error('Amount mismatch:', payment.amount, amount_cents)
+      return badRequest('Amount mismatch')
+    }
+
+    // 3. Update payment status
+    await prisma.$transaction(async (tx) => {
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: { status: isSuccess ? 'SUCCESS' : 'FAILED' }
+      })
+
+      if (isSuccess && payment.booking) {
+        await tx.booking.update({
+          where: { id: payment.booking.id },
+          data: { status: 'CONFIRMED' }
+        })
+      }
+    })
+
+    return success({}, 'Payment processed')
+  } catch (error) {
+    console.error('Webhook error:', error)
+    return badRequest('Payment processing failed')
+  }
+}
+import { NextRequest } from 'next/server'
+import prisma from '@/lib/prisma'
+import { success, badRequest } from '@/lib/responses'
+
 // هذا الـ webhook يستقبل callback من Paymob بعد الدفع
 export async function POST(request: NextRequest) {
   try {
