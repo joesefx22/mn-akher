@@ -1,4 +1,34 @@
-// أضف في أعلى الملف
+// أضف imports:
+'use client'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/context/AuthContext'
+
+// أضف في بداية المكون:
+const router = useRouter()
+const { user } = useAuth()
+
+// عدل دالة handleView:
+const handleView = () => {
+  if (onView) onView(id)
+  router.push(`/fields/${id}`)
+}
+
+// عدل زر "احجز الآن":
+<Button 
+  variant="outline"
+  fullWidth
+  className="justify-center"
+  onClick={() => {
+    if (!user) {
+      router.push(`/login?redirect=/fields/${id}`)
+    } else {
+      router.push(`/fields/${id}?book=true`)
+    }
+  }}
+>
+  احجز الآن
+</Button>
+    // أضف في أعلى الملف
 'use client'
 
 import { useState } from 'react'
