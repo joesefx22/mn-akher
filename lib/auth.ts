@@ -1,4 +1,36 @@
 import jwt from 'jsonwebtoken'
+import { cookies } from 'next/headers'
+
+const ACCESS_SECRET = process.env.ACCESS_SECRET!
+const REFRESH_SECRET = process.env.REFRESH_SECRET!
+
+export function signToken(payload: any, type: 'access' | 'refresh') {
+  return jwt.sign(payload, type === 'access' ? ACCESS_SECRET : REFRESH_SECRET, {
+    expiresIn: type === 'access' ? '15m' : '7d'
+  })
+}
+
+export function verifyToken(token: string, type: 'access' | 'refresh') {
+  try {
+    return jwt.verify(token, type === 'access' ? ACCESS_SECRET : REFRESH_SECRET)
+  } catch {
+    return null
+  }
+}
+
+export function setAuthCookies(user: any) {
+  const access = signToken(user, 'access')
+  const refresh = signToken(user, 'refresh')
+
+  cookies().set('access', access, { httpOnly: true, path: '/', maxAge: 60 * 15 })
+  cookies().set('refresh', refresh, { httpOnly: true, path: '/', maxAge: 60 * 60 * 24 * 7 })
+}
+
+export function clearAuthCookies() {
+  cookies().delete('access')
+  cookies().delete('refresh')
+}
+import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import prisma from './prisma'
 import { cookies } from 'next/headers'
