@@ -1,4 +1,67 @@
 import { PrismaClient } from '@prisma/client'
+import bcrypt from 'bcryptjs'
+
+const prisma = new PrismaClient()
+
+async function main() {
+  const pass = await bcrypt.hash('password123', 10)
+  const admin = await prisma.user.upsert({
+    where: { email: 'admin@ahgzly.local' },
+    update: {},
+    create: {
+      name: 'Admin',
+      email: 'admin@ahgzly.local',
+      password: pass,
+      role: 'ADMIN'
+    }
+  })
+
+  const owner = await prisma.user.upsert({
+    where: { email: 'owner@ahgzly.local' },
+    update: {},
+    create: {
+      name: 'Owner',
+      email: 'owner@ahgzly.local',
+      password: pass,
+      role: 'OWNER'
+    }
+  })
+
+  await prisma.field.createMany({
+    data: [
+      {
+        id: 'field-1',
+        name: 'ملعب الزمالك',
+        slug: 'zamalek-field',
+        description: 'ملعب عالي الجودة',
+        ownerId: owner.id,
+        pricePerHour: 50.0,
+        type: 'SOCCER'
+      },
+      {
+        id: 'field-2',
+        name: 'ملعب الأهلي',
+        slug: 'ahly-field',
+        description: 'ملعب ممتاز',
+        ownerId: owner.id,
+        pricePerHour: 40.0,
+        type: 'SOCCER'
+      }
+    ]
+  })
+
+  console.log('Seed complete')
+}
+
+main()
+  .catch(e => {
+    console.error(e)
+    process.exit(1)
+  })
+  .finally(async () => {
+    await prisma.$disconnect()
+  })
+import { PrismaClient } from '@prisma/client'
 import { hashPassword } from '../lib/auth'
 
 const prisma = new PrismaClient()
