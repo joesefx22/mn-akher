@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  OWNER
+  EMPLOYEE
+  ADMIN
+}
+
+enum FieldType {
+  SOCCER
+  PADEL
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  FAILED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+
+  fields        Field[]      @relation("OwnerFields")
+  bookings      Booking[]
+  ownedEmployees Employee[] @relation("OwnerEmployees")
+  asEmployee    Employee?    @relation("UserEmployee", fields: [employeeRefId], references: [id])
+  employeeRefId String?
+}
+
+model Area {
+  id     String  @id @default(uuid())
+  name   String  @unique
+  fields Field[]
+}
+
+model Field {
+  id           String      @id @default(uuid())
+  ownerId      String
+  owner        User        @relation("OwnerFields", fields: [ownerId], references: [id])
+  name         String
+  type         FieldType
+  pricePerHour Float
+  location     String
+  areaId       String
+  area         Area        @relation(fields: [areaId], references: [id])
+  image        String?
+  phone        String?
+  description  String?
+  createdAt    DateTime    @default(now())
+
+  openHour    String       // "06:00"
+  closeHour   String       // "23:00"
+  activeDays  Int[]        // 0 = Sun ... 6 = Sat
+
+  schedules    FieldSchedule[]
+  bookings     Booking[]
+}
+
+model TimeSlot {
+  id    String @id @default(uuid())
+  start String // "17:00"
+  end   String // "18:00"
+  label String @unique
+
+  schedules FieldSchedule[]
+  bookings  Booking[]
+}
+
+model FieldSchedule {
+  id        String   @id @default(uuid())
+  fieldId   String
+  field     Field    @relation(fields: [fieldId], references: [id])
+  slotId    String
+  slot      TimeSlot @relation(fields: [slotId], references: [id])
+  weekday   Int?     // 0..6 or null = every day
+
+  @@unique([fieldId, slotId, weekday], name: "field_slot_weekday_unique")
+}
+
+model Booking {
+  id             String   @id @default(uuid())
+  fieldId        String
+  field          Field    @relation(fields: [fieldId], references: [id])
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  date           DateTime // date-only, stored in UTC 00:00
+  slotId         String
+  slot           TimeSlot @relation(fields: [slotId], references: [id])
+  slotLabel      String
+  status         BookingStatus @default(PENDING)
+  paymentId      String?
+  amount         Float
+  createdAt      DateTime @default(now())
+  cancelledAt    DateTime?
+  cancelledBy    String?  // "user" | "employee" | "owner" | "system"
+  cancelReason   String?
+
+  payment        Payment? @relation(fields: [paymentId], references: [id])
+
+  @@unique([fieldId, date, slotId], name: "booking_unique_slot_per_field_day")
+  @@index([fieldId, date, slotId], name: "booking_field_date_slot_idx")
+}
+
+model Payment {
+  id            String   @id @default(uuid())
+  bookingId     String?
+  booking       Booking? @relation(fields: [bookingId], references: [id])
+  provider      String   // "paymob"
+  providerTxId  String
+  status        PaymentStatus
+  amount        Float
+  createdAt     DateTime @default(now())
+}
+
+model Employee {
+  id       String   @id @default(uuid())
+  ownerId  String
+  owner    User     @relation("OwnerEmployees", fields: [ownerId], references: [id])
+  userId   String
+  user     User     @relation("UserEmployee", fields: [userId], references: [id])
+
+  fieldIds String[]  // array of Field.id
+}
