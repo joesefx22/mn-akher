@@ -1,3 +1,28 @@
+import React from 'react'
+import { cookies } from 'next/headers'
+
+export const revalidate = 60
+
+export default async function FieldsPage() {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:3000'}/api/fields/list`, { cache: 'no-store' })
+  const json = await res.json()
+  const fields = json?.data?.fields || []
+
+  return (
+    <main>
+      <h1>قائمة الملاعب</h1>
+      <div className="grid">
+        {fields.map((f: any) => (
+          <div key={f.id} className="card">
+            <h3>{f.name}</h3>
+            <p>{f.description}</p>
+            <a href={`/fields/${f.id}`}>عرض</a>
+          </div>
+        ))}
+      </div>
+    </main>
+  )
+}
 // في دالة fetchFields أضف validation:
 const fetchFields = async (page = 1) => {
   setLoading(true)
