@@ -1,4 +1,46 @@
-'use client'
+// في دالة fetchFields أضف validation:
+const fetchFields = async (page = 1) => {
+  setLoading(true)
+  setError('')
+  
+  try {
+    const params = new URLSearchParams()
+    if (search) params.set('q', search)
+    if (fieldType !== 'ALL') params.set('type', fieldType)
+    if (area !== 'ALL') params.set('areaId', area)
+    params.set('page', page.toString())
+    params.set('limit', '12')
+    
+    const response = await fetch(`/api/fields/list?${params}`)
+    const data = await response.json()
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to load fields')
+    }
+    
+    // Validate response
+    if (!data.data || !Array.isArray(data.data.fields)) {
+      throw new Error('Invalid response format')
+    }
+    
+    setFields(data.data.fields)
+    setPagination(data.data.pagination || {
+      total: 0,
+      page: 1,
+      limit: 12,
+      totalPages: 1,
+      hasNext: false,
+      hasPrev: false
+    })
+    
+  } catch (err: any) {
+    setError(err.message)
+    console.error('Error:', err)
+  } finally {
+    setLoading(false)
+  }
+}
+  'use client'
 
 import { useState, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
