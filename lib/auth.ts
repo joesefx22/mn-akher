@@ -1,4 +1,68 @@
 import jwt from 'jsonwebtoken'
+import { NextRequest } from 'next/server'
+import prisma from './prisma'
+import bcrypt from 'bcryptjs'
+import { serialize } from 'cookie'
+
+const ACCESS_SECRET = process.env.ACCESS_SECRET!
+const REFRESH_SECRET = process.env.REFRESH_SECRET!
+
+export function signToken(payload: any, type: 'access' | 'refresh') {
+  return jwt.sign(payload, type === 'access' ? ACCESS_SECRET : REFRESH_SECRET, {
+    expiresIn: type === 'access' ? '15m' : '7d'
+  })
+}
+
+export function verifyToken(token: string, type: 'access' | 'refresh') {
+  try {
+    return jwt.verify(token, type === 'access' ? ACCESS_SECRET : REFRESH_SECRET) as any
+  } catch {
+    return null
+  }
+}
+
+export async function getUserFromAccessToken(req: NextRequest) {
+  const token = req.cookies.get('access')?.value
+  if (!token) return null
+  const payload = verifyToken(token, 'access')
+  if (!payload) return null
+  const user = await prisma.user.findUnique({ where: { id: payload.id }, select: { id: true, name: true, email: true, role: true }})
+  return user
+}
+
+export function createAuthCookies(user: any) {
+  const access = signToken({ id: user.id, role: user.role }, 'access')
+  const refresh = signToken({ id: user.id }, 'refresh')
+
+  const accessCookie = serialize('access', access, {
+    httpOnly: true,
+    path: '/',
+    sameSite: 'lax',
+    maxAge: 60 * 15 // 15 minutes
+  })
+  const refreshCookie = serialize('refresh', refresh, {
+    httpOnly: true,
+    path: '/',
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 24 * 7 // 7 days
+  })
+  return { accessCookie, refreshCookie }
+}
+
+export function clearAuthCookies() {
+  const accessCookie = serialize('access', '', { httpOnly: true, path: '/', maxAge: 0 })
+  const refreshCookie = serialize('refresh', '', { httpOnly: true, path: '/', maxAge: 0 })
+  return { accessCookie, refreshCookie }
+}
+
+export async function validateUserCredentials(email: string, password: string) {
+  const user = await prisma.user.findUnique({ where: { email } })
+  if (!user) return null
+  const match = await bcrypt.compare(password, user.password)
+  if (!match) return null
+  return user
+}
+import jwt from 'jsonwebtoken'
 import { cookies } from 'next/headers'
 
 const ACCESS_SECRET = process.env.ACCESS_SECRET!
