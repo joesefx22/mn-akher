@@ -1,3 +1,19 @@
+export const success = (data: any, status: number = 200) => {
+  return Response.json({ ok: true, data }, { status })
+}
+
+export const fail = (msg: string, status: number = 400) => {
+  return Response.json({ ok: false, msg }, { status })
+}
+
+export const unauthorized = () => fail('Unauthorized', 401)
+
+export const serverError = (err: any) => {
+  console.error(err)
+  return fail('Server error', 500)
+}
+
+export const validationError = (msg: string) => fail(msg, 422)
 export function success(data: any = null, message: string = '') {
   return Response.json(
     { status: 'success', message, data },
