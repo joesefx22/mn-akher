@@ -1,5 +1,25 @@
 import { NextRequest } from 'next/server'
 import prisma from '@/lib/prisma'
+import { success, fail } from '@/lib/responses'
+
+export async function GET(req: NextRequest) {
+  try {
+    const id = req.nextUrl.searchParams.get('id')
+    if (!id) return fail('Missing id', 400)
+
+    const field = await prisma.field.findUnique({
+      where: { id },
+      include: { owner: { select: { id: true, name: true } } }
+    })
+    if (!field) return fail('Field not found', 404)
+    return success({ field })
+  } catch (err) {
+    console.error(err)
+    return fail('Cannot fetch field', 500)
+  }
+}
+import { NextRequest } from 'next/server'
+import prisma from '@/lib/prisma'
 import { formatDateToUTC, getWeekday } from '@/lib/helpers'
 import { success, badRequest, notFound } from '@/lib/responses'
 
