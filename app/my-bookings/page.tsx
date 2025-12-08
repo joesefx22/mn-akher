@@ -1,3 +1,46 @@
+'use client'
+import React, { useEffect, useState } from 'react'
+import { useAuth } from '@/app/contexts/AuthContext'
+
+export default function MyBookingsPage() {
+  const { user, loading } = useAuth()
+  const [bookings, setBookings] = useState<any[]>([])
+  const [loadingBookings, setLoadingBookings] = useState(false)
+
+  useEffect(() => {
+    if (!loading) fetchBookings()
+  }, [loading, user])
+
+  const fetchBookings = async () => {
+    setLoadingBookings(true)
+    try {
+      const res = await fetch('/api/bookings/list', { credentials: 'include' })
+      const j = await res.json()
+      if (!res.ok) throw new Error(j.msg || 'Failed')
+      setBookings(j.data.bookings || [])
+    } catch (err: any) {
+      console.error(err)
+    } finally {
+      setLoadingBookings(false)
+    }
+  }
+
+  if (loadingBookings) return <div>جارٍ التحميل...</div>
+  return (
+    <div>
+      <h1>حجوزاتي</h1>
+      {bookings.length === 0 ? <p>لا توجد حجوزات</p> : (
+        <ul>
+          {bookings.map(b => (
+            <li key={b.id}>
+              {b.field?.name} - {new Date(b.date).toLocaleString()} - {b.status}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
 // في دالة fetchBookings أضف validation:
 const fetchBookings = async () => {
   setLoading(true)
