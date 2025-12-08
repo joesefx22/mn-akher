@@ -1,3 +1,37 @@
+// الخطأ الشائع: مفيش token refresh
+async function checkAuth() {
+  const res = await fetch('/api/auth/me')
+  // إذا التوكن منتهي؟ مفيش handle
+}
+
+// الصح:
+async function checkAuth() {
+  try {
+    const res = await fetch('/api/auth/me', { credentials: 'include' })
+    
+    if (res.status === 401) {
+      // Token expired, try refresh
+      const refreshRes = await fetch('/api/auth/refresh', {
+        method: 'POST',
+        credentials: 'include'
+      })
+      
+      if (refreshRes.ok) {
+        // Retry original request
+        const retryRes = await fetch('/api/auth/me', { credentials: 'include' })
+        if (retryRes.ok) {
+          const data = await retryRes.json()
+          setUser(data.data.user)
+        }
+      }
+    } else if (res.ok) {
+      const data = await res.json()
+      setUser(data.data.user)
+    }
+  } catch (error) {
+    setUser(null)
+  }
+}
 // في دالة checkAuth:
 async function checkAuth() {
   try {
