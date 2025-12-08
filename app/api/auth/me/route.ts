@@ -10,8 +10,16 @@ export async function GET(request: NextRequest) {
       return unauthorized('غير مصرح')
     }
 
-    return success({ user }, 'تم جلب بيانات المستخدم')
-    
+    return success({ 
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        createdAt: user.createdAt
+      }
+    }, 'تم جلب بيانات المستخدم')
+
   } catch (error) {
     console.error('Get current user error:', error)
     return unauthorized('غير مصرح')
