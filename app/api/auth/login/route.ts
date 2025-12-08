@@ -1,4 +1,32 @@
 import { NextRequest } from 'next/server'
+import prisma from '@/lib/prisma'
+import { validateUserCredentials, createAuthCookies } from '@/lib/auth'
+import { success, fail } from '@/lib/responses'
+import bcrypt from 'bcryptjs'
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json()
+    const { email, password } = body
+    if (!email || !password) return fail('Email and password required', 400)
+
+    const user = await validateUserCredentials(email, password)
+    if (!user) return fail('Invalid credentials', 401)
+
+    const { accessCookie, refreshCookie } = createAuthCookies(user)
+    const redirectPath = user.role === 'OWNER' ? '/dashboard/owner' :
+                         user.role === 'EMPLOYEE' ? '/dashboard/employee' :
+                         user.role === 'ADMIN' ? '/dashboard/admin' : '/dashboard/player'
+
+    const response = success({ user: { id: user.id, name: user.name, email: user.email, role: user.role }, redirect: redirectPath })
+    response.headers.set('Set-Cookie', `${accessCookie}; ${refreshCookie}`)
+    return response
+  } catch (err) {
+    console.error(err)
+    return fail('Login error', 500)
+  }
+}
+import { NextRequest } from 'next/server'
 import { comparePasswords, setAuthCookie, signToken } from '@/lib/auth'
 import { isValidEmail } from '@/lib/helpers'
 import prisma from '@/lib/prisma'
