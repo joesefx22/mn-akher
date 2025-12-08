@@ -1,4 +1,38 @@
-'use client'
+// أضف imports
+import { useAuth } from '@/context/AuthContext'
+
+// في fetchFieldDetails أضف error handling
+const fetchFieldDetails = async (date?: Date) => {
+  setLoading(true)
+  setError('')
+  
+  try {
+    const dateStr = format(date || selectedDate, 'yyyy-MM-dd')
+    const response = await fetch(`/api/fields/details?id=${fieldId}&date=${dateStr}`)
+    
+    if (!response.ok) {
+      const data = await response.json()
+      throw new Error(data.message || 'فشل تحميل التفاصيل')
+    }
+    
+    const data = await response.json()
+    
+    // التحقق من البيانات
+    if (!data.data || !data.data.field) {
+      throw new Error('بيانات غير صالحة')
+    }
+    
+    setField(data.data.field)
+    setAvailableSlots(data.data.availableSlots || [])
+    
+  } catch (err: any) {
+    setError(err.message || 'حدث خطأ غير متوقع')
+    console.error('Error:', err)
+  } finally {
+    setLoading(false)
+  }
+}
+  'use client'
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
