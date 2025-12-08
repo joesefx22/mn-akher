@@ -1,3 +1,53 @@
+// في دالة fetchFieldDetails أضف error handling:
+const fetchFieldDetails = async (date?: Date) => {
+  setLoading(true)
+  setError('')
+  
+  try {
+    const dateStr = format(date || selectedDate, 'yyyy-MM-dd')
+    const response = await fetch(`/api/fields/details?id=${fieldId}&date=${dateStr}`)
+    
+    if (!response.ok) {
+      const data = await response.json()
+      throw new Error(data.message || 'Failed to load field details')
+    }
+    
+    const data = await response.json()
+    
+    // Validate response structure
+    if (!data.data || !data.data.field) {
+      throw new Error('Invalid data structure')
+    }
+    
+    setField(data.data.field)
+    setAvailableSlots(data.data.availableSlots || [])
+    
+  } catch (err: any) {
+    setError(err.message || 'An unexpected error occurred')
+    console.error('Fetch error:', err)
+  } finally {
+    setLoading(false)
+  }
+}
+
+// في دالة handleBookSlot أضف validation:
+const handleBookSlot = async (slotId: string) => {
+  if (!user) {
+    router.push(`/login?redirect=/fields/${fieldId}`)
+    return
+  }
+
+  const selectedSlot = availableSlots.find(slot => slot.slotId === slotId)
+  if (!selectedSlot || selectedSlot.status !== 'available') {
+    setError('This slot is no longer available')
+    return
+  }
+
+  // Disable all buttons during booking
+  setBookingLoading(true)
+  setError('')
+  setSuccess('')
+}
 // أضف imports
 import { useAuth } from '@/context/AuthContext'
 
