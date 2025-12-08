@@ -6,6 +6,42 @@ import { success, badRequest, unauthorized } from '@/lib/responses'
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser()
+    if (!user) return unauthorized('Login required')
+    
+    const { bookingId } = await request.json()
+    if (!bookingId) return badRequest('Booking ID required')
+    
+    const booking = await prisma.booking.findUnique({
+      where: { 
+        id: bookingId,
+        userId: user.id,
+        status: 'PENDING'
+      },
+      include: { field: true, payment: true }
+    })
+    
+    if (!booking) return badRequest('Booking not found or not payable')
+    if (!booking.payment) return badRequest('No payment found')
+    
+    // MVP: Mock payment URL
+    const paymentUrl = `/payments/process?paymentId=${booking.payment.id}`
+    
+    return success({ 
+      paymentUrl,
+      payment: booking.payment
+    })
+  } catch (error) {
+    return badRequest('Error initiating payment')
+  }
+}
+import { NextRequest } from 'next/server'
+import { getCurrentUser } from '@/lib/auth'
+import prisma from '@/lib/prisma'
+import { success, badRequest, unauthorized } from '@/lib/responses'
+
+export async function POST(request: NextRequest) {
+  try {
+    const user = await getCurrentUser()
     if (!user) {
       return unauthorized('يجب تسجيل الدخول')
     }
