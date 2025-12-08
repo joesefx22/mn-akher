@@ -1,4 +1,11 @@
-// أضف imports:
+// في Header أضف:
+const { user } = useAuth()
+
+// بدل الروابط الثابتة:
+<Link href={user ? `/dashboard/${user.role.toLowerCase()}` : '/login'}>
+  <User className="h-5 w-5" />
+  <span>{user ? 'حسابي' : 'تسجيل الدخول'}</span>
+</Link>// أضف imports:
 'use client'
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/context/AuthContext'
