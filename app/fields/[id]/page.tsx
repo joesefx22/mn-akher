@@ -1,4 +1,57 @@
-// في دالة fetchFieldDetails أضف error handling:
+// في دالة handleBookSlot:
+const handleBookSlot = async (slotId: string) => {
+  if (!user) {
+    router.push(`/login?redirect=/fields/${fieldId}`)
+    return
+  }
+
+  setBookingLoading(true)
+  setError('')
+  
+  try {
+    const dateStr = format(selectedDate, 'yyyy-MM-dd')
+    const response = await fetch('/api/bookings/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fieldId, date: dateStr, slotId })
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to create booking')
+    }
+
+    // 🔥 هنا الفرق: إذا في payment لازم نوجه للدفع
+    if (data.data.payUrl || data.data.payment) {
+      // إنشاء جلسة دفع
+      const paymentRes = await fetch('/api/payments/create-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId: data.data.booking.id })
+      })
+      
+      const paymentData = await paymentRes.json()
+      
+      if (paymentRes.ok && paymentData.data.mockPaymentUrl) {
+        // للـ MVP: توجيه للدفع الوهمي
+        window.location.href = paymentData.data.mockPaymentUrl
+      } else {
+        // في الإنتاج: توجيه لـ Paymob
+        // window.location.href = paymentData.data.paymobIframeUrl
+        setSuccess('تم إنشاء الحجز. يرجى إكمال الدفع.')
+      }
+    } else {
+      setSuccess('تم تأكيد الحجز بنجاح!')
+      fetchFieldDetails(selectedDate)
+    }
+
+  } catch (err: any) {
+    setError(err.message)
+  } finally {
+    setBookingLoading(false)
+  }
+}// في دالة fetchFieldDetails أضف error handling:
 const fetchFieldDetails = async (date?: Date) => {
   setLoading(true)
   setError('')
