@@ -9,6 +9,38 @@ export async function GET(
 ) {
   try {
     const user = await getCurrentUser()
+    if (!user) return unauthorized('Login required')
+    
+    const booking = await prisma.booking.findUnique({
+      where: { id: params.id },
+      include: {
+        field: { include: { area: true, owner: { select: { id: true, name: true } } } },
+        slot: true,
+        user: { select: { id: true, name: true } },
+        payment: true
+      }
+    })
+    
+    if (!booking) return badRequest('Booking not found')
+    
+    const isAuthorized = booking.userId === user.id || booking.field.ownerId === user.id || user.role === 'ADMIN'
+    if (!isAuthorized) return unauthorized('Not authorized')
+    
+    return success({ booking })
+  } catch (error) {
+    return badRequest('Error fetching booking')
+  }
+}import { NextRequest } from 'next/server'
+import { getCurrentUser } from '@/lib/auth'
+import prisma from '@/lib/prisma'
+import { success, badRequest, unauthorized } from '@/lib/responses'
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const user = await getCurrentUser()
     if (!user) {
       return unauthorized('يجب تسجيل الدخول')
     }
