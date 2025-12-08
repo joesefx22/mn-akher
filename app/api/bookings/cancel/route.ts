@@ -1,4 +1,35 @@
 import { NextRequest } from 'next/server'
+import prisma from '@/lib/prisma'
+import { verifyToken } from '@/lib/auth'
+import { success, unauthorized, fail } from '@/lib/responses'
+
+export async function POST(req: NextRequest) {
+  const token = req.cookies.get('access')?.value
+  if (!token) return unauthorized()
+  const payload = verifyToken(token, 'access')
+  if (!payload) return unauthorized()
+
+  const { bookingId } = await req.json()
+  if (!bookingId) return fail('Missing bookingId', 400)
+
+  // basic permission: owner or user can cancel
+  const booking = await prisma.booking.findUnique({ where: { id: bookingId } })
+  if (!booking) return fail('Booking not found', 404)
+
+  const userId = (payload as any).id
+  const role = (payload as any).role
+  if (booking.userId !== userId && role !== 'OWNER' && role !== 'ADMIN') {
+    return fail('Not allowed', 403)
+  }
+
+  const updated = await prisma.booking.update({
+    where: { id: bookingId },
+    data: { status: 'CANCELLED' }
+  })
+
+  return success({ booking: updated })
+}
+import { NextRequest } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { success, badRequest, unauthorized } from '@/lib/responses'
