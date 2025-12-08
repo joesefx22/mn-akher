@@ -1,3 +1,71 @@
+'use client'
+
+import React, { createContext, useContext, useEffect, useState } from 'react'
+
+type User = { id: string, name: string, email: string, role: string } | null
+
+const AuthContext = createContext({
+  user: null as User,
+  loading: true,
+  checkAuth: async () => {},
+  logout: async () => {}
+})
+
+export const useAuth = () => useContext(AuthContext)
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User>(null)
+  const [loading, setLoading] = useState(true)
+
+  const checkAuth = async () => {
+    try {
+      setLoading(true)
+      const res = await fetch('/api/auth/me', { credentials: 'include', headers: { 'Cache-Control': 'no-cache' } })
+      if (res.status === 401) {
+        const r = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' })
+        if (!r.ok) {
+          setUser(null)
+          setLoading(false)
+          return
+        }
+        const retry = await fetch('/api/auth/me', { credentials: 'include' })
+        if (retry.ok) {
+          const data = await retry.json()
+          setUser(data.data.user)
+          setLoading(false)
+          return
+        }
+        setUser(null)
+        setLoading(false)
+        return
+      }
+      if (res.ok) {
+        const data = await res.json()
+        setUser(data.data.user)
+      } else setUser(null)
+    } catch (err) {
+      console.error('checkAuth error', err)
+      setUser(null)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    checkAuth()
+  }, [])
+
+  const logout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+    setUser(null)
+  }
+
+  return (
+    <AuthContext.Provider value={{ user, loading, checkAuth, logout }}>
+      {children}
+    </AuthContext.Provider>
+  )
+}
 // الخطأ الشائع: مفيش token refresh
 async function checkAuth() {
   const res = await fetch('/api/auth/me')
