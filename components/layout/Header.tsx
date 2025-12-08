@@ -1,3 +1,36 @@
+// أضف imports:
+'use client'
+import { useState, useEffect } from 'react'
+import { useAuth } from '@/context/AuthContext'
+
+// أضف في بداية المكون:
+const { user, logout } = useAuth()
+const [mounted, setMounted] = useState(false)
+
+useEffect(() => {
+  setMounted(true)
+}, [])
+
+// غير رواق تسجيل الدخول/حسابي لتكون ديناميكية:
+{!user ? (
+  <Link href="/login" className="flex items-center gap-2 text-gray-700 hover:text-primary-600">
+    <LogIn className="h-5 w-5" />
+    <span>تسجيل الدخول</span>
+  </Link>
+) : (
+  <div className="flex items-center gap-4">
+    <Link href={`/dashboard/${user.role.toLowerCase()}`} className="flex items-center gap-2 text-gray-700 hover:text-primary-600">
+      <User className="h-5 w-5" />
+      <span>حسابي</span>
+    </Link>
+    <button 
+      onClick={logout}
+      className="text-gray-700 hover:text-danger-600 text-sm"
+    >
+      تسجيل الخروج
+    </button>
+  </div>
+)}
 import Link from 'next/link'
 import { Home, Calendar, User, LogIn, Menu, X } from 'lucide-react'
 import { useState } from 'react'
