@@ -2,6 +2,54 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { verifyToken } from '@/lib/auth'
 
+export function middleware(req: NextRequest) {
+  const access = req.cookies.get('access')?.value
+  const url = req.nextUrl.pathname
+
+  const PUBLIC = [
+    '/login',
+    '/register',
+    '/',
+    '/api/auth/login',
+    '/api/auth/register',
+    '/api/auth/refresh',
+    '/api/fields/list',
+    '/api/fields/details'
+  ]
+
+  if (PUBLIC.some((p) => url.startsWith(p))) {
+    return NextResponse.next()
+  }
+
+  if (!access) {
+    return NextResponse.redirect(new URL('/login', req.url))
+  }
+
+  const user = verifyToken(access, 'access')
+  if (!user) {
+    return NextResponse.redirect(new URL('/login', req.url))
+  }
+
+  if (url.startsWith('/dashboard')) {
+    if (url.includes('/owner') && user.role !== 'owner')
+      return NextResponse.redirect(new URL('/', req.url))
+    if (url.includes('/admin') && user.role !== 'admin')
+      return NextResponse.redirect(new URL('/', req.url))
+    if (url.includes('/employee') && user.role !== 'employee')
+      return NextResponse.redirect(new URL('/', req.url))
+  }
+
+  return NextResponse.next()
+}
+
+export const config = {
+  matcher: ['/dashboard/:path*', '/api/:path*']
+}
+
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+import { verifyToken } from '@/lib/auth'
+
 // Public paths that don't require authentication
 const publicPaths = [
   '/',
