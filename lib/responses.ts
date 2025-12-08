@@ -1,3 +1,25 @@
+export function success(data: any, status = 200) {
+  return new Response(JSON.stringify({ ok: true, data }), {
+    status,
+    headers: { 'Content-Type': 'application/json' }
+  })
+}
+
+export function fail(msg: string, status = 400) {
+  return new Response(JSON.stringify({ ok: false, msg }), {
+    status,
+    headers: { 'Content-Type': 'application/json' }
+  })
+}
+
+export function unauthorized() {
+  return fail('Unauthorized', 401)
+}
+
+export function serverError(err?: any) {
+  console.error(err)
+  return fail('Server error', 500)
+}
 export const success = (data: any, status: number = 200) => {
   return Response.json({ ok: true, data }, { status })
 }
