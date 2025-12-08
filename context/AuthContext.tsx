@@ -1,3 +1,42 @@
+// في دالة checkAuth أضف error handling
+async function checkAuth() {
+  try {
+    const res = await fetch('/api/auth/me', {
+      credentials: 'include' // مهم جداً
+    })
+    
+    if (res.ok) {
+      const data = await res.json()
+      if (data.data && data.data.user) {
+        setUser(data.data.user)
+      }
+    } else {
+      // إذا فشل، حاول refresh token
+      await refreshToken()
+    }
+  } catch (error) {
+    console.error('Auth check failed:', error)
+    setUser(null)
+  } finally {
+    setIsLoading(false)
+  }
+}
+
+// دالة refresh token
+async function refreshToken() {
+  try {
+    const res = await fetch('/api/auth/refresh', {
+      method: 'POST',
+      credentials: 'include'
+    })
+    
+    if (res.ok) {
+      await checkAuth()
+    }
+  } catch (error) {
+    console.error('Token refresh failed:', error)
+  }
+}
 'use client'
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
