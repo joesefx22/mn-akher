@@ -1,4 +1,29 @@
 import { NextRequest } from 'next/server'
+import { verifyToken, signToken, clearAuthCookies } from '@/lib/auth'
+import { success, fail, unauthorized } from '@/lib/responses'
+import { serialize } from 'cookie'
+import prisma from '@/lib/prisma'
+
+export async function POST(req: NextRequest) {
+  const refresh = req.cookies.get('refresh')?.value
+  if (!refresh) return unauthorized()
+
+  const payload = verifyToken(refresh, 'refresh')
+  if (!payload) return unauthorized()
+
+  // verify user still exists
+  const user = await prisma.user.findUnique({ where: { id: (payload as any).id } })
+  if (!user) return unauthorized()
+
+  // issue new access token
+  const newAccess = signToken({ id: user.id, role: user.role }, 'access')
+  const accessCookie = serialize('access', newAccess, { httpOnly: true, path: '/', sameSite: 'lax', maxAge: 60 * 15 })
+
+  const res = success({ ok: true })
+  res.headers.set('Set-Cookie', accessCookie)
+  return res
+}
+import { NextRequest } from 'next/server'
 import { verifyToken, signToken, setAuthCookie } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { success, unauthorized } from '@/lib/responses'
