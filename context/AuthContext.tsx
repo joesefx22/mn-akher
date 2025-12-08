@@ -1,3 +1,47 @@
+// في دالة checkAuth:
+async function checkAuth() {
+  try {
+    const res = await fetch('/api/auth/me', {
+      credentials: 'include' // مهم
+    })
+    
+    if (res.ok) {
+      const data = await res.json()
+      if (data.data?.user) {
+        setUser(data.data.user)
+      }
+    } else {
+      // Token might be expired, try refresh
+      await refreshToken()
+    }
+  } catch (error) {
+    console.error('Auth check failed:', error)
+    setUser(null)
+  } finally {
+    setIsLoading(false)
+  }
+}
+
+// أضف دالة refreshToken:
+async function refreshToken() {
+  try {
+    const res = await fetch('/api/auth/refresh', {
+      method: 'POST',
+      credentials: 'include'
+    })
+    
+    if (res.ok) {
+      await checkAuth() // Retry auth check
+    }
+  } catch (error) {
+    console.error('Token refresh failed:', error)
+  }
+}
+
+// أضف في return الـ context:
+refreshUser: async () => {
+  await checkAuth()
+}
 // في دالة checkAuth أضف error handling
 async function checkAuth() {
   try {
