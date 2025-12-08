@@ -1,3 +1,35 @@
+// أضف في أعلى الملف
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/context/AuthContext'
+
+// في دالة handleView أضف:
+const { user } = useAuth()
+const router = useRouter()
+
+const handleView = () => {
+  if (onView) onView(id)
+  router.push(`/fields/${id}`)
+}
+
+// في زر "احجز الآن" أضف:
+<Button 
+  variant="outline"
+  fullWidth
+  className="justify-center"
+  onClick={() => {
+    if (!user) {
+      router.push(`/login?redirect=/fields/${id}`)
+    } else {
+      router.push(`/fields/${id}?book=true`)
+    }
+  }}
+>
+  احجز الآن
+</Button>
+    
 import Image from 'next/image'
 import Link from 'next/link'
 import { MapPin, Clock, Users, Star } from 'lucide-react'
