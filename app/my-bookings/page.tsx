@@ -1,4 +1,63 @@
-'use client'
+// في دالة fetchBookings أضف validation:
+const fetchBookings = async () => {
+  setLoading(true)
+  setError('')
+  
+  try {
+    const response = await fetch('/api/bookings/list?role=player')
+    const data = await response.json()
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to load bookings')
+    }
+    
+    // Validate response
+    if (!data.data || !Array.isArray(data.data.bookings)) {
+      throw new Error('Invalid response format')
+    }
+    
+    setBookings(data.data.bookings)
+    
+  } catch (err: any) {
+    setError(err.message)
+    console.error('Error:', err)
+  } finally {
+    setLoading(false)
+  }
+}
+
+// في دالة handleCancelBooking أضف confirmation:
+const handleCancelBooking = async (bookingId: string) => {
+  if (!confirm('Are you sure you want to cancel this booking?')) {
+    return
+  }
+  
+  setCancellingId(bookingId)
+  setError('')
+  setSuccess('')
+  
+  try {
+    const response = await fetch('/api/bookings/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bookingId, reason: 'User request' })
+    })
+    
+    const data = await response.json()
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to cancel booking')
+    }
+    
+    setSuccess('Booking cancelled successfully')
+    fetchBookings() // Refresh list
+    
+  } catch (err: any) {
+    setError(err.message)
+  } finally {
+    setCancellingId(null)
+  }
+}'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
