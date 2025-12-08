@@ -1,5 +1,32 @@
 import { NextRequest } from 'next/server'
 import prisma from '@/lib/prisma'
+import { success, fail } from '@/lib/responses'
+
+export async function GET(req: NextRequest) {
+  try {
+    const q = req.nextUrl.searchParams
+    const type = q.get('type')
+    const take = Number(q.get('take') || 20)
+    const skip = Number(q.get('skip') || 0)
+
+    const where: any = {}
+    if (type) where.type = type
+
+    const fields = await prisma.field.findMany({
+      where,
+      take,
+      skip,
+      include: { owner: { select: { id: true, name: true } } }
+    })
+
+    return success({ fields })
+  } catch (err) {
+    console.error(err)
+    return fail('Cannot fetch fields', 500)
+  }
+}
+import { NextRequest } from 'next/server'
+import prisma from '@/lib/prisma'
 import { success, badRequest } from '@/lib/responses'
 
 export async function GET(request: NextRequest) {
