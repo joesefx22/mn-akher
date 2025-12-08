@@ -1,3 +1,40 @@
+'use client'
+import Link from 'next/link'
+import React from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/app/contexts/AuthContext'
+
+type Props = {
+  id: string
+  name: string
+  pricePerHour: number
+  areaName?: string
+}
+
+export default function FieldCard({ id, name, pricePerHour, areaName }: Props) {
+  const router = useRouter()
+  const { user } = useAuth()
+
+  const handleBook = () => {
+    if (!user) {
+      router.push(`/login?redirect=/fields/${id}`)
+      return
+    }
+    router.push(`/fields/${id}`)
+  }
+
+  return (
+    <div className="card">
+      <h3>{name}</h3>
+      <p>{areaName}</p>
+      <p>{pricePerHour} جنيه / ساعة</p>
+      <div className="flex gap-2">
+        <button onClick={handleBook}>احجز الآن</button>
+        <Link href={`/fields/${id}`}><button>تفاصيل</button></Link>
+      </div>
+    </div>
+  )
+}
 // أضف imports:
 'use client'
 import { useRouter } from 'next/navigation'
