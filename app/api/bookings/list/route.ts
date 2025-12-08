@@ -1,4 +1,30 @@
 import { NextRequest } from 'next/server'
+import prisma from '@/lib/prisma'
+import { verifyToken } from '@/lib/auth'
+import { success, unauthorized } from '@/lib/responses'
+
+export async function GET(req: NextRequest) {
+  const token = req.cookies.get('access')?.value
+  if (!token) return unauthorized()
+  const payload = verifyToken(token, 'access')
+  if (!payload) return unauthorized()
+
+  const userId = (payload as any).id
+  const role = (payload as any).role
+
+  if (role === 'OWNER') {
+    // owner sees bookings for their fields
+    const fields = await prisma.field.findMany({ where: { ownerId: userId }, select: { id: true } })
+    const fieldIds = fields.map(f => f.id)
+    const bookings = await prisma.booking.findMany({ where: { fieldId: { in: fieldIds } }, include: { field: true, user: true } })
+    return success({ bookings })
+  }
+
+  // default: player sees their bookings
+  const bookings = await prisma.booking.findMany({ where: { userId }, include: { field: true } })
+  return success({ bookings })
+}
+import { NextRequest } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { success, unauthorized } from '@/lib/responses'
