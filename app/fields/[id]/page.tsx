@@ -1,3 +1,24 @@
+// الخطأ الشائع: مفيش credentials
+const response = await fetch(`/api/fields/details?id=${fieldId}`)
+// الصح:
+const response = await fetch(`/api/fields/details?id=${fieldId}`, {
+  credentials: 'include' // عشان يبعت الـ cookies
+})
+
+// الخطأ الشائع: مفيش error handling
+const data = await response.json()
+setField(data.field)
+// الصح:
+if (!response.ok) {
+  const error = await response.json()
+  throw new Error(error.message)
+}
+const data = await response.json()
+if (data.status === 'success') {
+  setField(data.data.field)
+} else {
+  throw new Error(data.message)
+}
 // في دالة handleBookSlot:
 const handleBookSlot = async (slotId: string) => {
   if (!user) {
