@@ -1,3 +1,14 @@
+'use client'
+import React from 'react'
+
+export default function BookingSlot({ slotStart, onBook }: { slotStart: string, onBook: () => void }) {
+  return (
+    <div className="slot">
+      <div>{new Date(slotStart).toLocaleString()}</div>
+      <button onClick={onBook}>احجز</button>
+    </div>
+  )
+}
 import { Clock, Check, X, AlertCircle, CreditCard } from 'lucide-react'
 import Button from '@/components/ui/Button'
 
