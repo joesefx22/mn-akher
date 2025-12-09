@@ -1,3 +1,51 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+export default function PlayerDashboard() {
+  const [user, setUser] = useState(null);
+  const [bookings, setBookings] = useState([]);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((res) => res.json())
+      .then((data) => setUser(data.user));
+
+    fetch("/api/bookings/list")
+      .then((res) => res.json())
+      .then((data) => setBookings(data.bookings));
+  }, []);
+
+  return (
+    <div className="p-6 space-y-6">
+      <h1 className="text-3xl font-bold">لوحة اللاعب</h1>
+
+      {user && (
+        <div className="bg-gray-100 p-4 rounded">
+          <p>مرحباً، {user.name}</p>
+        </div>
+      )}
+
+      <div>
+        <h2 className="text-xl font-semibold mb-2">حجوزاتك</h2>
+        <div className="space-y-3">
+          {bookings.map((b) => (
+            <div
+              key={b.id}
+              className="p-3 rounded border shadow-sm bg-white"
+            >
+              <p>الملعب: {b.field.name}</p>
+              <p>التاريخ: {b.date}</p>
+              <p>الوقت: {b.time}</p>
+              <p className="font-bold">{b.status}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 'use client'
 
 import { useState, useEffect } from 'react'
