@@ -1,3 +1,20 @@
+export const success = (data: any, status: number = 200) =>
+  Response.json(
+    {
+      success: true,
+      data,
+    },
+    { status }
+  );
+
+export const error = (message: string, status: number = 400) =>
+  Response.json(
+    {
+      success: false,
+      message,
+    },
+    { status }
+  );
 export function success(data: any, status = 200) {
   return new Response(JSON.stringify({ ok: true, data }), {
     status,
