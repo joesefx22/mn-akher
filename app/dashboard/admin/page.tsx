@@ -1,3 +1,57 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+export default function AdminDashboard() {
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/admin/stats", { credentials: "include" });
+        if (!res.ok) throw new Error("Failed");
+        const j = await res.json();
+        setStats(j);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  if (loading) return <div className="p-6">جارٍ التحميل…</div>;
+
+  return (
+    <div className="p-6 space-y-6">
+      <h1 className="text-2xl font-bold">لوحة الإدارة</h1>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="p-4 bg-white rounded shadow">
+          <div className="text-sm text-gray-500">المستخدمون</div>
+          <div className="text-2xl font-bold">{stats?.totalUsers ?? 0}</div>
+        </div>
+        <div className="p-4 bg-white rounded shadow">
+          <div className="text-sm text-gray-500">الملاعب</div>
+          <div className="text-2xl font-bold">{stats?.totalFields ?? 0}</div>
+        </div>
+        <div className="p-4 bg-white rounded shadow">
+          <div className="text-sm text-gray-500">الحجوزات</div>
+          <div className="text-2xl font-bold">{stats?.totalBookings ?? 0}</div>
+        </div>
+        <div className="p-4 bg-white rounded shadow">
+          <div className="text-sm text-gray-500">الإيرادات</div>
+          <div className="text-2xl font-bold">{stats?.revenue ?? 0} ج.م</div>
+        </div>
+      </div>
+
+      <div className="mt-6">
+        <a href="/admin/manage-users" className="text-blue-600 underline">إدارة المستخدمين</a>
+      </div>
+    </div>
+  );
+}
 'use client'
 
 import { useState, useEffect } from 'react'
