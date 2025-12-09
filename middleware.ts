@@ -1,3 +1,55 @@
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { verifyToken } from './lib/auth';
+
+const AUTH_PATHS = ['/login', '/register'];
+const PROTECTED_PATHS = ['/dashboard', '/my-bookings', '/fields'];
+
+export async function middleware(req: NextRequest) {
+  const token = req.cookies.get('token')?.value || null;
+  const { pathname } = req.nextUrl;
+
+  // 1) منع المستخدم المسجل من فتح صفحات login/register
+  if (AUTH_PATHS.some(p => pathname.startsWith(p))) {
+    if (token) {
+      const user = await verifyToken(token);
+      if (user) {
+        return NextResponse.redirect(new URL('/dashboard', req.url));
+      }
+    }
+    return NextResponse.next();
+  }
+
+  // 2) حماية المسارات الخاصة
+  if (PROTECTED_PATHS.some(p => pathname.startsWith(p))) {
+    if (!token) {
+      return NextResponse.redirect(new URL('/login', req.url));
+    }
+
+    const user = await verifyToken(token);
+    if (!user) {
+      return NextResponse.redirect(new URL('/login', req.url));
+    }
+
+    // attach user to request headers
+    const response = NextResponse.next();
+    response.headers.set('x-user-id', user.id.toString());
+    response.headers.set('x-user-role', user.role);
+    return response;
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: [
+    '/dashboard/:path*',
+    '/my-bookings/:path*',
+    '/fields/:path*',
+    '/login',
+    '/register'
+  ]
+};
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 
