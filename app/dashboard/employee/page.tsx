@@ -1,3 +1,86 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+type Booking = {
+  id: string;
+  date: string;
+  time: string;
+  status: string;
+  player: { name: string; email: string };
+  field: { name: string };
+};
+
+export default function EmployeeDashboard() {
+  const [pending, setPending] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchPending = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/employee/dashboard", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load");
+      const data = await res.json();
+      // endpoint returns todayBookings / pending
+      setPending(data.todayBookings || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPending();
+  }, []);
+
+  const action = async (id: string, verb: "accept" | "reject") => {
+    try {
+      const res = await fetch(`/api/bookings/${verb}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId: id })
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "Action failed");
+      fetchPending();
+    } catch (err: any) {
+      alert(err.message || "حدث خطأ");
+    }
+  };
+
+  if (loading) return <div className="p-6">جارٍ التحميل…</div>;
+
+  return (
+    <div className="p-6 space-y-6">
+      <h1 className="text-2xl font-bold">لوحة الموظف</h1>
+
+      <section>
+        <h2 className="text-lg font-semibold mb-3">الحجوزات اليوم</h2>
+        {pending.length === 0 ? (
+          <p>لا توجد حجوزات اليوم.</p>
+        ) : (
+          <div className="space-y-3">
+            {pending.map((b) => (
+              <div key={b.id} className="p-3 rounded border bg-white flex justify-between items-center">
+                <div>
+                  <div className="font-semibold">{b.field?.name}</div>
+                  <div className="text-sm">{b.date} — {b.time}</div>
+                  <div className="text-sm text-gray-600">اللاعب: {b.player?.name}</div>
+                </div>
+                <div className="flex gap-2">
+                  <button className="px-3 py-1 bg-green-600 text-white rounded" onClick={() => action(b.id, "accept")}>قبول</button>
+                  <button className="px-3 py-1 bg-red-600 text-white rounded" onClick={() => action(b.id, "reject")}>رفض</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
 'use client'
 
 import { useState, useEffect } from 'react'
