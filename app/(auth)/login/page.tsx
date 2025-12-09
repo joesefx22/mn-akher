@@ -1,3 +1,36 @@
+'use client';
+
+import { useState } from 'react';
+import { useAuth } from '../../../contexts/AuthContext';
+import Input from '../../../components/ui/Input';
+import Button from '../../../components/ui/Button';
+
+export default function LoginPage() {
+  const { login } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const handleLogin = async () => {
+    const result = await login(email, password);
+    if (result.error) setError(result.error);
+  };
+
+  return (
+    <div className="max-w-md mx-auto bg-white p-6 rounded shadow">
+      <h1 className="text-xl font-bold mb-4">تسجيل الدخول</h1>
+
+      {error && <p className="text-red-500">{error}</p>}
+
+      <Input label="البريد الإلكتروني" value={email} onChange={(e) => setEmail(e.target.value)} />
+      <Input label="كلمة المرور" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+
+      <Button onClick={handleLogin} className="w-full mt-4">
+        تسجيل الدخول
+      </Button>
+    </div>
+  );
+}
 'use client'
 
 import { useState } from 'react'
