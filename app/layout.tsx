@@ -1,3 +1,23 @@
+import "./globals.css";
+import Header from "@/components/layout/Header";
+import Footer from "@/components/layout/Footer";
+
+export const metadata = {
+  title: "احجزلي",
+  description: "منصة حجز الملاعب الرياضية",
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="ar" dir="rtl">
+      <body className="bg-gray-50 text-gray-900">
+        <Header />
+        <main className="min-h-screen container mx-auto py-6">{children}</main>
+        <Footer />
+      </body>
+    </html>
+  );
+}
 import type { Metadata } from 'next'
 import { Inter, Cairo } from 'next/font/google'
 import './globals.css'
