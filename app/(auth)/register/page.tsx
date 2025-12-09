@@ -1,3 +1,36 @@
+'use client';
+
+import { useState } from 'react';
+import { useAuth } from '../../../contexts/AuthContext';
+import Input from '../../../components/ui/Input';
+import Button from '../../../components/ui/Button';
+
+export default function RegisterPage() {
+  const { register: registerUser } = useAuth();
+  const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [error, setError] = useState('');
+
+  const handleRegister = async () => {
+    const result = await registerUser(form);
+    if (result.error) setError(result.error);
+  };
+
+  return (
+    <div className="max-w-md mx-auto bg-white p-6 rounded shadow">
+      <h1 className="text-xl font-bold mb-4">إنشاء حساب</h1>
+
+      {error && <p className="text-red-500">{error}</p>}
+
+      <Input label="الاسم" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+      <Input label="البريد الإلكتروني" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+      <Input label="كلمة المرور" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+
+      <Button onClick={handleRegister} className="w-full mt-4">
+        إنشاء حساب
+      </Button>
+    </div>
+  );
+}
 'use client'
 
 import { useState } from 'react'
