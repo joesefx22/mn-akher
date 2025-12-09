@@ -1,3 +1,32 @@
+import React from "react";
+
+export const revalidate = 60; // cache for 60s
+
+export default async function FieldsPage() {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "";
+  const res = await fetch(`${apiUrl}/fields/list`, { cache: "no-store" });
+  if (!res.ok) {
+    return <div className="p-6">فشل تحميل الملاعب</div>;
+  }
+  const j = await res.json();
+  const fields = j.data?.fields ?? [];
+
+  return (
+    <main className="p-6">
+      <h1 className="text-2xl font-bold mb-4">قائمة الملاعب</h1>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {fields.map((f: any) => (
+          <div key={f.id} className="bg-white p-4 rounded shadow">
+            <h2 className="font-semibold">{f.name}</h2>
+            <p className="text-sm text-gray-600">{f.description}</p>
+            <p className="mt-2 font-bold">{f.pricePerHour} ج.م / ساعة</p>
+            <a href={`/fields/${f.id}`} className="text-blue-600 underline mt-3 inline-block">عرض الملعب</a>
+          </div>
+        ))}
+      </div>
+    </main>
+  );
+}
 import React from 'react'
 import { cookies } from 'next/headers'
 
