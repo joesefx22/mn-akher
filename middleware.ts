@@ -1,3 +1,32 @@
+import { NextRequest, NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
+
+const PROTECTED_ROUTES = ["/dashboard", "/my-bookings", "/fields"];
+
+export function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+  const access = req.cookies.get("accessToken")?.value;
+
+  if (!PROTECTED_ROUTES.some((route) => pathname.startsWith(route)))
+    return NextResponse.next();
+
+  if (!access) {
+    return NextResponse.redirect(new URL("/login", req.url));
+  }
+
+  try {
+    const decoded = jwt.verify(access, process.env.JWT_SECRET!);
+
+    (req as any).user = decoded;
+    return NextResponse.next();
+  } catch (e) {
+    return NextResponse.redirect(new URL("/login", req.url));
+  }
+}
+
+export const config = {
+  matcher: ["/dashboard/:path*", "/my-bookings/:path*", "/fields/:path*"],
+};
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { verifyToken } from './lib/auth'
