@@ -1,3 +1,41 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+export default function OwnerDashboard() {
+  const [fields, setFields] = useState([]);
+
+  useEffect(() => {
+    fetch("/api/owner/fields")
+      .then((res) => res.json())
+      .then((data) => setFields(data.fields));
+  }, []);
+
+  return (
+    <div className="p-6 space-y-6">
+      <h1 className="text-3xl font-bold">لوحة صاحب الملعب</h1>
+
+      <div className="space-y-4">
+        {fields.map((field) => (
+          <div
+            key={field.id}
+            className="p-4 bg-white rounded shadow"
+          >
+            <h2 className="text-xl font-semibold">{field.name}</h2>
+            <p>عدد الحجوزات: {field.bookings.length}</p>
+
+            <a
+              href={`/dashboard/owner/${field.id}`}
+              className="text-blue-600 underline"
+            >
+              عرض التفاصيل
+            </a>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 'use client'
 
 import { useState, useEffect } from 'react'
