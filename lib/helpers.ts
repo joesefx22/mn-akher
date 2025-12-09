@@ -1,3 +1,19 @@
+export const hashPassword = async (password: string) => {
+  const bcrypt = await import("bcryptjs");
+  return bcrypt.hash(password, 10);
+};
+
+export const comparePassword = async (password: string, hash: string) => {
+  const bcrypt = await import("bcryptjs");
+  return bcrypt.compare(password, hash);
+};
+
+export const generateRandomCode = (len = 6) => {
+  let code = "";
+  const chars = "0123456789";
+  for (let i = 0; i < len; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+};
 export const generateSlug = (name: string) =>
   name.toLowerCase().replace(/ /g, '-').replace(/[^\w-]+/g, '')
 
