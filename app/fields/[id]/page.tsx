@@ -1,3 +1,87 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+
+export default function FieldDetails({ params }: { params: { id: string } }) {
+  const fieldId = params.id;
+  const router = useRouter();
+
+  const [field, setField] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [slots, setSlots] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchField = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/fields/details?id=${fieldId}`, { credentials: "include" });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.msg || "فشل التحميل");
+      setField(j.data.field);
+      // Generate example slots (server should provide real schedule)
+      const generated = [1,2,3,4].map(i => {
+        const d = new Date(Date.now() + i*3600*1000);
+        return d.toISOString();
+      });
+      setSlots(generated);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchField();
+  }, [fieldId]);
+
+  const handleBook = async (slotISO: string) => {
+    try {
+      const res = await fetch("/api/bookings/create", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fieldId, date: slotISO.split("T")[0], startTime: slotISO.split("T")[1].slice(0,5), endTime: "" })
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || j.msg || "حجز فشل");
+      // if response contains paymentUrl redirect
+      if (j.data?.paymentUrl) {
+        window.location.href = j.data.paymentUrl;
+        return;
+      }
+      // else go to my bookings
+      router.push("/my-bookings");
+    } catch (err: any) {
+      alert(err.message || "حدث خطأ أثناء الحجز");
+    }
+  };
+
+  if (loading) return <div className="p-6">جارٍ التحميل…</div>;
+  if (error) return <div className="p-6 text-red-600">خطأ: {error}</div>;
+  if (!field) return <div className="p-6">الملعب غير موجود</div>;
+
+  return (
+    <main className="p-6 space-y-4">
+      <h1 className="text-2xl font-bold">{field.name}</h1>
+      <p>{field.description}</p>
+      <p className="font-bold">{field.pricePerHour} ج.م / ساعة</p>
+
+      <section>
+        <h2 className="text-lg font-semibold">الأوقات المتاحة</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+          {slots.map((s) => (
+            <div key={s} className="p-3 rounded border bg-white flex justify-between items-center">
+              <div>{new Date(s).toLocaleString()}</div>
+              <button className="px-3 py-1 bg-primary text-white rounded" onClick={() => handleBook(s)}>احجز الآن</button>
+            </div>
+          ))}
+        </div>
+      </section>
+    </main>
+  );
+}
 'use client'
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
