@@ -1,3 +1,31 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import FieldCard from '../components/features/FieldCard';
+import { apiGet } from '../lib/helpers';
+
+export default function HomePage() {
+  const [fields, setFields] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiGet('/api/fields/list')
+      .then((res) => {
+        setFields(res.data);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <p>جاري التحميل...</p>;
+
+  return (
+    <div className="grid md:grid-cols-3 gap-4">
+      {fields.map(field => (
+        <FieldCard key={field.id} field={field} />
+      ))}
+    </div>
+  );
+}
 import { Calendar, Football, Users, Clock } from 'lucide-react'
 import Link from 'next/link'
 import Button from '@/components/ui/Button'
