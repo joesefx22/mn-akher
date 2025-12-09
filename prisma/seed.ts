@@ -1,3 +1,28 @@
+import { PrismaClient } from "@prisma/client";
+const prisma = new PrismaClient();
+
+async function main() {
+  const admin = await prisma.user.upsert({
+    where: { email: "admin@ahgzly.com" },
+    update: {},
+    create: {
+      name: "Admin",
+      email: "admin@ahgzly.com",
+      password: "$2a$10$testtesttesttesttest", // ضع هاش فعلي هنا
+      role: "ADMIN"
+    }
+  });
+
+  console.log("Seed completed:", { admin });
+}
+
+main()
+  .then(() => prisma.$disconnect())
+  .catch((e) => {
+    console.error(e);
+    prisma.$disconnect();
+    process.exit(1);
+  });
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
