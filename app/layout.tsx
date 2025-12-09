@@ -1,3 +1,30 @@
+import './globals.css';
+import { AuthProvider } from '../contexts/AuthContext';
+import Header from '../components/layout/Header';
+import Footer from '../components/layout/Footer';
+import Toast from '../components/ui/Toast';
+
+export const metadata = {
+  title: 'احجزلي | منصة حجز الملاعب',
+  description: 'احجز ملعب، تابع مواعيدك، وادير نشاطك الرياضي بسهولة.'
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="ar" dir="rtl">
+      <body className="bg-gray-100">
+        <AuthProvider>
+          <Header />
+          <main className="container mx-auto py-6">
+            {children}
+          </main>
+          <Footer />
+          <Toast />
+        </AuthProvider>
+      </body>
+    </html>
+  );
+}
 import "./globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
