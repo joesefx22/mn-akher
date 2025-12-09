@@ -1,3 +1,52 @@
+import jwt from "jsonwebtoken";
+import { cookies } from "next/headers";
+
+const ACCESS_EXPIRES = "15m";
+const REFRESH_EXPIRES = "7d";
+
+export const generateTokens = (payload: any) => {
+  const accessToken = jwt.sign(payload, process.env.JWT_SECRET!, {
+    expiresIn: ACCESS_EXPIRES,
+  });
+
+  const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET!, {
+    expiresIn: REFRESH_EXPIRES,
+  });
+
+  return { accessToken, refreshToken };
+};
+
+export const setAuthCookies = (accessToken: string, refreshToken: string) => {
+  const cookieStore = cookies();
+
+  cookieStore.set("accessToken", accessToken, {
+    httpOnly: true,
+    path: "/",
+    sameSite: "strict",
+  });
+
+  cookieStore.set("refreshToken", refreshToken, {
+    httpOnly: true,
+    path: "/",
+    sameSite: "strict",
+  });
+};
+
+export const verifyAccess = (token: string) => {
+  try {
+    return jwt.verify(token, process.env.JWT_SECRET!);
+  } catch (e) {
+    return null;
+  }
+};
+
+export const verifyRefresh = (token: string) => {
+  try {
+    return jwt.verify(token, process.env.JWT_REFRESH_SECRET!);
+  } catch (e) {
+    return null;
+  }
+};
 import jwt from 'jsonwebtoken'
 import { NextRequest } from 'next/server'
 import prisma from './prisma'
