@@ -1,4 +1,97 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    
+    // الفلاتر
+    const type = searchParams.get('type');
+    const areaId = searchParams.get('areaId');
+    const q = searchParams.get('q');
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '12');
+    const skip = (page - 1) * limit;
+
+    // بناء query
+    const where: any = {};
+    
+    if (type && type !== 'ALL') {
+      where.type = type;
+    }
+    
+    if (areaId && areaId !== 'ALL') {
+      where.areaId = areaId;
+    }
+    
+    if (q) {
+      where.OR = [
+        { name: { contains: q, mode: 'insensitive' } },
+        { location: { contains: q, mode: 'insensitive' } },
+        { description: { contains: q, mode: 'insensitive' } }
+      ];
+    }
+
+    // جلب البيانات
+    const [fields, total] = await Promise.all([
+      prisma.field.findMany({
+        where,
+        include: {
+          area: true,
+          owner: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          },
+          _count: {
+            select: {
+              bookings: {
+                where: {
+                  status: 'CONFIRMED'
+                }
+              }
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit
+      }),
+      
+      prisma.field.count({ where })
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return NextResponse.json({
+      status: 'success',
+      data: {
+        fields,
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrev: page > 1
+        }
+      }
+    });
+
+  } catch (error: any) {
+    console.error('Error fetching fields:', error);
+    
+    return NextResponse.json(
+      { 
+        status: 'error',
+        message: 'حدث خطأ في جلب الملاعب'
+      },
+      { status: 500 }
+    );
+  }
+}import { NextRequest } from 'next/server'
 import prisma from '@/lib/prisma'
 import { success, fail } from '@/lib/responses'
 
