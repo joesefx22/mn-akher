@@ -1,4 +1,18 @@
-// tailwind.config.js
+// tailwind.config.js - الإضافات
+module.exports = {
+  theme: {
+    extend: {
+      // ... إعدادات سابقة
+      animation: {
+        'pulse-slow': 'pulse 3s ease-in-out infinite',
+        'bounce-slow': 'bounce 2s ease-in-out infinite',
+      },
+      backgroundImage: {
+        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+      },
+    },
+  },
+}// tailwind.config.js
 module.exports = {
   content: [
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
