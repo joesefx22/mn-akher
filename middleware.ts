@@ -1,328 +1,337 @@
-// middleware/roleGuard.js
-import { NextResponse } from "next/server";
-import { verifyAuthToken } from "@/utils/auth";
-
-const roleGuard = (allowedRoles = []) => {
-  return async function middleware(req) {
-    try {
-      const token = req.cookies.get("token")?.value;
-      if (!token) return NextResponse.redirect(new URL("/login", req.url));
-
-      const user = verifyAuthToken(token);
-      if (!user) return NextResponse.redirect(new URL("/login", req.url));
-
-      if (!allowedRoles.includes(user.role)) {
-        return new NextResponse(JSON.stringify({ error: "Forbidden" }), { status: 403 });
-      }
-
-      return NextResponse.next();
-    } catch (err) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
-  };
-};
-
-export default roleGuard;import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { verifyToken } from './lib/auth';
-
-const AUTH_PATHS = ['/login', '/register'];
-const PROTECTED_PATHS = ['/dashboard', '/my-bookings', '/fields'];
-
-export async function middleware(req: NextRequest) {
-  const token = req.cookies.get('token')?.value || null;
-  const { pathname } = req.nextUrl;
-
-  // 1) منع المستخدم المسجل من فتح صفحات login/register
-  if (AUTH_PATHS.some(p => pathname.startsWith(p))) {
-    if (token) {
-      const user = await verifyToken(token);
-      if (user) {
-        return NextResponse.redirect(new URL('/dashboard', req.url));
-      }
-    }
-    return NextResponse.next();
-  }
-
-  // 2) حماية المسارات الخاصة
-  if (PROTECTED_PATHS.some(p => pathname.startsWith(p))) {
-    if (!token) {
-      return NextResponse.redirect(new URL('/login', req.url));
-    }
-
-    const user = await verifyToken(token);
-    if (!user) {
-      return NextResponse.redirect(new URL('/login', req.url));
-    }
-
-    // attach user to request headers
-    const response = NextResponse.next();
-    response.headers.set('x-user-id', user.id.toString());
-    response.headers.set('x-user-role', user.role);
-    return response;
-  }
-
-  return NextResponse.next();
-}
-
-export const config = {
-  matcher: [
-    '/dashboard/:path*',
-    '/my-bookings/:path*',
-    '/fields/:path*',
-    '/login',
-    '/register'
-  ]
-};
-import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
-
-const PROTECTED_ROUTES = ["/dashboard", "/my-bookings", "/fields"];
-
-export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-  const access = req.cookies.get("accessToken")?.value;
-
-  if (!PROTECTED_ROUTES.some((route) => pathname.startsWith(route)))
-    return NextResponse.next();
-
-  if (!access) {
-    return NextResponse.redirect(new URL("/login", req.url));
-  }
-
-  try {
-    const decoded = jwt.verify(access, process.env.JWT_SECRET!);
-
-    (req as any).user = decoded;
-    return NextResponse.next();
-  } catch (e) {
-    return NextResponse.redirect(new URL("/login", req.url));
-  }
-}
-
-export const config = {
-  matcher: ["/dashboard/:path*", "/my-bookings/:path*", "/fields/:path*"],
-};
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
-import { verifyToken } from './lib/auth'
-
-export function middleware(req: NextRequest) {
-  const url = req.nextUrl.pathname
-  const access = req.cookies.get('access')?.value
-
-  const PUBLIC = [
-    '/',
-    '/login',
-    '/register',
-    '/api/auth/login',
-    '/api/auth/register',
-    '/api/auth/refresh',
-    '/api/fields/list',
-    '/api/fields/details'
-  ]
-
-  if (PUBLIC.some(p => url.startsWith(p))) return NextResponse.next()
-
-  if (!access) {
-    // for pages redirect to login
-    if (!url.startsWith('/api/')) {
-      const redirectUrl = new URL('/login', req.url)
-      redirectUrl.searchParams.set('redirect', req.url)
-      return NextResponse.redirect(redirectUrl)
-    }
-    return NextResponse.json({ ok:false, msg: 'Unauthorized' }, { status: 401 })
-  }
-
-  const payload = verifyToken(access, 'access')
-  if (!payload) {
-    // Attempt to allow API to trigger refresh flow client-side; for pages force login
-    if (!url.startsWith('/api/')) {
-      const redirectUrl = new URL('/login', req.url)
-      redirectUrl.searchParams.set('redirect', req.url)
-      return NextResponse.redirect(redirectUrl)
-    }
-    return NextResponse.json({ ok:false, msg:'Unauthorized' }, { status: 401 })
-  }
-
-  // role-based guards for dashboard
-  if (url.startsWith('/dashboard')) {
-    const role = (payload as any).role?.toLowerCase?.() || ''
-    if (url.includes('/owner') && role !== 'owner') return NextResponse.redirect(new URL('/', req.url))
-    if (url.includes('/admin') && role !== 'admin') return NextResponse.redirect(new URL('/', req.url))
-    if (url.includes('/employee') && role !== 'employee') return NextResponse.redirect(new URL('/', req.url))
-  }
-
-  const res = NextResponse.next()
-  // security headers
-  res.headers.set('X-Content-Type-Options', 'nosniff')
-  res.headers.set('X-Frame-Options', 'SAMEORIGIN')
-  res.headers.set('Referrer-Policy', 'no-referrer')
-  res.headers.set('Access-Control-Allow-Credentials', 'true')
-  return res
-}
-
-export const config = {
-  matcher: ['/dashboard/:path*', '/api/:path*', '/fields/:path*', '/my-bookings']
-}
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { verifyToken } from '@/lib/auth'
+import { USER_ROLES } from '@/lib/constants'
+import { rateLimit, authRateLimit } from '@/lib/rateLimit'
+import logger from '@/lib/logger'
+import { AppError, ErrorCode } from '@/lib/errors'
 
-export function middleware(req: NextRequest) {
-  const access = req.cookies.get('access')?.value
-  const url = req.nextUrl.pathname
-
-  const PUBLIC = [
-    '/login',
-    '/register',
-    '/',
-    '/api/auth/login',
-    '/api/auth/register',
-    '/api/auth/refresh',
-    '/api/fields/list',
-    '/api/fields/details'
-  ]
-
-  if (PUBLIC.some((p) => url.startsWith(p))) {
-    return NextResponse.next()
-  }
-
-  if (!access) {
-    return NextResponse.redirect(new URL('/login', req.url))
-  }
-
-  const user = verifyToken(access, 'access')
-  if (!user) {
-    return NextResponse.redirect(new URL('/login', req.url))
-  }
-
-  if (url.startsWith('/dashboard')) {
-    if (url.includes('/owner') && user.role !== 'owner')
-      return NextResponse.redirect(new URL('/', req.url))
-    if (url.includes('/admin') && user.role !== 'admin')
-      return NextResponse.redirect(new URL('/', req.url))
-    if (url.includes('/employee') && user.role !== 'employee')
-      return NextResponse.redirect(new URL('/', req.url))
-  }
-
-  return NextResponse.next()
-}
-
-export const config = {
-  matcher: ['/dashboard/:path*', '/api/:path*']
-}
-
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
-import { verifyToken } from '@/lib/auth'
-
-// Public paths that don't require authentication
-const publicPaths = [
+// المسارات العامة التي لا تحتاج مصادقة
+const PUBLIC_PATHS = [
   '/',
   '/login',
   '/register',
+  '/reset-password',
+  '/forgot-password',
   '/fields',
-  '/api/auth/login',
-  '/api/auth/register',
-  '/api/fields/list',
-  '/api/fields/details'
+  '/about',
+  '/contact',
+  '/privacy',
+  '/terms',
+  '/refund',
 ]
 
-// Role-based dashboard access
-const roleBasedPaths: Record<string, string[]> = {
-  '/dashboard/player': ['USER', 'ADMIN'],
-  '/dashboard/owner': ['OWNER', 'ADMIN'],
-  '/dashboard/employee': ['EMPLOYEE', 'ADMIN', 'OWNER'],
-  '/dashboard/admin': ['ADMIN']
+// مسارات الـ API العامة
+const PUBLIC_API_PATHS = [
+  '/api/auth/login',
+  '/api/auth/register',
+  '/api/auth/refresh',
+  '/api/auth/forgot-password',
+  '/api/auth/reset-password',
+  '/api/fields/list',
+  '/api/fields/details',
+  '/api/areas/list',
+  '/api/payments/webhook', // مهم: public للـ webhooks
+]
+
+// وصول حسب الدور
+const ROLE_BASED_ACCESS: Record<string, string[]> = {
+  // الداشبوردات
+  '/dashboard/player': [USER_ROLES.USER, USER_ROLES.PLAYER, USER_ROLES.ADMIN],
+  '/dashboard/owner': [USER_ROLES.OWNER, USER_ROLES.ADMIN],
+  '/dashboard/employee': [USER_ROLES.EMPLOYEE, USER_ROLES.OWNER, USER_ROLES.ADMIN],
+  '/dashboard/admin': [USER_ROLES.ADMIN],
+  
+  // API حسب الدور
+  '/api/fields/create': [USER_ROLES.OWNER, USER_ROLES.ADMIN],
+  '/api/fields/update': [USER_ROLES.OWNER, USER_ROLES.ADMIN],
+  '/api/schedule/generate': [USER_ROLES.OWNER, USER_ROLES.ADMIN],
+  '/api/owner': [USER_ROLES.OWNER, USER_ROLES.ADMIN],
+  '/api/admin': [USER_ROLES.ADMIN],
+  '/api/employee': [USER_ROLES.EMPLOYEE, USER_ROLES.OWNER, USER_ROLES.ADMIN],
 }
 
+// Middleware الرئيسي
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const token = request.cookies.get('token')?.value
+  const startTime = Date.now()
 
-  // Check if path is public
-  const isPublicPath = publicPaths.some(path => 
-    pathname === path || pathname.startsWith(path + '/')
-  )
+  try {
+    // 1. تسجيل الطلب
+    logger.http(`[${request.method}] ${pathname}`, {
+      ip: getClientIp(request),
+      userAgent: request.headers.get('user-agent'),
+    })
 
-  if (isPublicPath) {
-    return NextResponse.next()
-  }
-
-  // Check for dashboard access
-  const isDashboardPath = pathname.startsWith('/dashboard')
-  
-  if (isDashboardPath) {
-    if (!token) {
-      const loginUrl = new URL('/login', request.url)
-      loginUrl.searchParams.set('redirect', pathname)
-      return NextResponse.redirect(loginUrl)
-    }
-
-    const decoded = verifyToken(token)
-    if (!decoded) {
-      return NextResponse.redirect(new URL('/login', request.url))
-    }
-
-    // Check role-based access
-    for (const [path, allowedRoles] of Object.entries(roleBasedPaths)) {
-      if (pathname.startsWith(path)) {
-        if (!allowedRoles.includes(decoded.role)) {
-          return NextResponse.redirect(new URL('/dashboard/player', request.url))
+    // 2. التحقق من المسارات العامة
+    if (isPublicPath(pathname)) {
+      // منع المستخدم المسجل من الوصول لصفحات المصادقة
+      if (isAuthPath(pathname) && token) {
+        const user = await verifyToken(token)
+        if (user) {
+          return redirectToDashboard(request, user.role)
         }
-        break
+      }
+      return addSecurityHeaders(NextResponse.next())
+    }
+
+    // 3. معدل الطلبات للنقاط الحرجة
+    if (isAuthPath(pathname)) {
+      const rateLimitResponse = await authRateLimit(request)
+      if (rateLimitResponse.status === 429) {
+        return rateLimitResponse
       }
     }
-  }
 
-  // Check for protected API routes
-  const isProtectedApi = pathname.startsWith('/api/') && 
-    !pathname.startsWith('/api/auth/') &&
-    !pathname.startsWith('/api/fields/list') &&
-    !pathname.startsWith('/api/fields/details')
-
-  if (isProtectedApi) {
+    // 4. التحقق من المصادقة
     if (!token) {
-      return NextResponse.json(
-        { status: 'error', message: 'Unauthorized' },
-        { status: 401 }
-      )
+      return handleUnauthorized(request, pathname)
     }
 
-    const decoded = verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json(
-        { status: 'error', message: 'Invalid token' },
-        { status: 401 }
-      )
+    const user = await verifyToken(token)
+    if (!user) {
+      return handleUnauthorized(request, pathname)
     }
 
-    // Add user info to headers for API routes
+    // 5. التحقق من الوصول حسب الدور
+    const roleAccessError = checkRoleAccess(pathname, user.role)
+    if (roleAccessError) {
+      return roleAccessError
+    }
+
+    // 6. إضافة معلومات المستخدم للـ headers
     const requestHeaders = new Headers(request.headers)
-    requestHeaders.set('x-user-id', decoded.id)
-    requestHeaders.set('x-user-role', decoded.role)
+    requestHeaders.set('x-user-id', user.id)
+    requestHeaders.set('x-user-role', user.role)
+    requestHeaders.set('x-user-email', user.email)
 
-    return NextResponse.next({
+    // 7. التحقق من API المحمية
+    if (isProtectedApiPath(pathname)) {
+      // معدل الطلبات للـ API المحمية
+      const rateLimitResponse = await rateLimit(request)
+      if (rateLimitResponse.status === 429) {
+        return rateLimitResponse
+      }
+    }
+
+    // 8. المتابعة مع الـ headers
+    const response = NextResponse.next({
       request: {
         headers: requestHeaders,
       },
     })
-  }
 
-  return NextResponse.next()
+    // 9. إضافة headers الأمنية
+    addSecurityHeaders(response)
+
+    // 10. تسجيل نجاح الطلب
+    const responseTime = Date.now() - startTime
+    logger.http(`[${request.method}] ${pathname} - ${response.status}`, {
+      userId: user.id,
+      userRole: user.role,
+      responseTime,
+      status: response.status,
+    })
+
+    return response
+
+  } catch (error) {
+    // 11. معالجة الأخطاء
+    const responseTime = Date.now() - startTime
+    logger.error(`Middleware error: ${pathname}`, {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      responseTime,
+    })
+
+    if (error instanceof AppError) {
+      return NextResponse.json(
+        {
+          status: 'error',
+          error: error.code,
+          message: error.message,
+        },
+        { status: error.statusCode }
+      )
+    }
+
+    // للأخطاء غير المتوقعة، نعيد توجيه لصفحة الخطأ
+    if (!pathname.startsWith('/api/')) {
+      const errorUrl = new URL('/error', request.url)
+      errorUrl.searchParams.set('message', 'حدث خطأ غير متوقع')
+      return NextResponse.redirect(errorUrl)
+    }
+
+    return NextResponse.json(
+      {
+        status: 'error',
+        error: ErrorCode.INTERNAL_SERVER_ERROR,
+        message: 'خطأ داخلي في الخادم',
+      },
+      { status: 500 }
+    )
+  }
 }
 
+// دوال مساعدة
+function isPublicPath(pathname: string): boolean {
+  // المسارات العامة
+  if (PUBLIC_PATHS.some(path => pathname === path || pathname.startsWith(path + '/'))) {
+    return true
+  }
+
+  // API العامة
+  if (PUBLIC_API_PATHS.some(path => pathname.startsWith(path))) {
+    return true
+  }
+
+  // الملفات الثابتة
+  if (
+    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/_static/') ||
+    pathname.startsWith('/_vercel/') ||
+    pathname.match(/\.(ico|png|jpg|jpeg|gif|svg|css|js|woff|woff2|ttf|eot)$/)
+  ) {
+    return true
+  }
+
+  return false
+}
+
+function isAuthPath(pathname: string): boolean {
+  return pathname.startsWith('/login') || 
+         pathname.startsWith('/register') ||
+         pathname.startsWith('/forgot-password') ||
+         pathname.startsWith('/reset-password') ||
+         pathname.startsWith('/api/auth/')
+}
+
+function isProtectedApiPath(pathname: string): boolean {
+  return pathname.startsWith('/api/') && 
+         !PUBLIC_API_PATHS.some(path => pathname.startsWith(path))
+}
+
+function getClientIp(request: NextRequest): string {
+  return (
+    request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
+    request.headers.get('x-real-ip') ||
+    request.ip ||
+    'unknown'
+  )
+}
+
+function checkRoleAccess(pathname: string, userRole: string): NextResponse | null {
+  for (const [path, allowedRoles] of Object.entries(ROLE_BASED_ACCESS)) {
+    if (pathname.startsWith(path)) {
+      if (!allowedRoles.includes(userRole)) {
+        logger.warn(`Role access denied: ${userRole} trying to access ${pathname}`)
+        
+        if (pathname.startsWith('/api/')) {
+          return NextResponse.json(
+            {
+              status: 'error',
+              error: ErrorCode.FORBIDDEN,
+              message: 'غير مصرح بالوصول لهذا المورد',
+            },
+            { status: 403 }
+          )
+        }
+        
+        // توجيه للداشبورد المناسب
+        return redirectToDashboard(null, userRole)
+      }
+      break
+    }
+  }
+  return null
+}
+
+function handleUnauthorized(request: NextRequest, pathname: string): NextResponse {
+  logger.warn(`Unauthorized access attempt: ${pathname}`)
+  
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.json(
+      {
+        status: 'error',
+        error: ErrorCode.UNAUTHORIZED,
+        message: 'يجب تسجيل الدخول للوصول إلى هذا المورد',
+      },
+      { status: 401 }
+    )
+  }
+  
+  const loginUrl = new URL('/login', request.url)
+  loginUrl.searchParams.set('redirect', pathname)
+  loginUrl.searchParams.set('message', 'يجب تسجيل الدخول للوصول لهذه الصفحة')
+  
+  return NextResponse.redirect(loginUrl)
+}
+
+function redirectToDashboard(request: NextRequest | null, userRole: string): NextResponse {
+  let dashboardPath = '/dashboard/player'
+  
+  switch (userRole) {
+    case USER_ROLES.ADMIN:
+      dashboardPath = '/dashboard/admin'
+      break
+    case USER_ROLES.OWNER:
+      dashboardPath = '/dashboard/owner'
+      break
+    case USER_ROLES.EMPLOYEE:
+      dashboardPath = '/dashboard/employee'
+      break
+  }
+  
+  if (request) {
+    return NextResponse.redirect(new URL(dashboardPath, request.url))
+  }
+  
+  return NextResponse.redirect(new URL(dashboardPath))
+}
+
+function addSecurityHeaders(response: NextResponse): NextResponse {
+  // CSP Header للـ Next.js
+  const csp = [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: https:",
+    "font-src 'self'",
+    "connect-src 'self'",
+    "frame-src 'self'",
+    "media-src 'self'",
+  ].join('; ')
+
+  response.headers.set('Content-Security-Policy', csp)
+  response.headers.set('X-Content-Type-Options', 'nosniff')
+  response.headers.set('X-Frame-Options', 'SAMEORIGIN')
+  response.headers.set('X-XSS-Protection', '1; mode=block')
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+  response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+  
+  // CORS headers للـ API
+  if (response.headers.get('content-type')?.includes('application/json')) {
+    response.headers.set('Access-Control-Allow-Origin', process.env.NEXT_PUBLIC_BASE_URL || '*')
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    response.headers.set('Access-Control-Allow-Credentials', 'true')
+  }
+
+  return response
+}
+
+// التكوين
 export const config = {
   matcher: [
     /*
      * Match all request paths except:
      * 1. /_next/ (Next.js internals)
-     * 2. /_static (inside /public)
+     * 2. /_static (static files)
      * 3. /_vercel (Vercel internals)
-     * 4. /api/payments/webhook (public webhook)
-     * 5. /favicon.ico, /sitemap.xml, /robots.txt (static files)
+     * 4. /api/auth/refresh (handled specially)
+     * 5. Static files with extensions
      */
-    '/((?!_next/|_static|_vercel|api/payments/webhook|favicon.ico|sitemap.xml|robots.txt).*)',
+    '/((?!_next/|_static|_vercel|api/auth/refresh|favicon.ico|robots.txt|sitemap.xml).*)',
   ],
 }
