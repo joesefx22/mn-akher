@@ -1,110 +1,181 @@
-export const success = (data: any, status: number = 200) =>
-  Response.json(
-    {
-      success: true,
-      data,
-    },
-    { status }
-  );
+import { NextResponse } from 'next/server'
 
-export const error = (message: string, status: number = 400) =>
-  Response.json(
+export interface ApiResponse<T = any> {
+  status: 'success' | 'error'
+  message: string
+  data?: T
+  meta?: {
+    page?: number
+    limit?: number
+    total?: number
+    pages?: number
+  }
+}
+
+// Success Responses
+export function success<T = any>(
+  data?: T,
+  message: string = 'تمت العملية بنجاح',
+  meta?: ApiResponse['meta']
+): NextResponse<ApiResponse<T>> {
+  return NextResponse.json(
     {
-      success: false,
+      status: 'success',
       message,
+      data,
+      meta,
     },
-    { status }
-  );
-export function success(data: any, status = 200) {
-  return new Response(JSON.stringify({ ok: true, data }), {
-    status,
-    headers: { 'Content-Type': 'application/json' }
-  })
-}
-
-export function fail(msg: string, status = 400) {
-  return new Response(JSON.stringify({ ok: false, msg }), {
-    status,
-    headers: { 'Content-Type': 'application/json' }
-  })
-}
-
-export function unauthorized() {
-  return fail('Unauthorized', 401)
-}
-
-export function serverError(err?: any) {
-  console.error(err)
-  return fail('Server error', 500)
-}
-export const success = (data: any, status: number = 200) => {
-  return Response.json({ ok: true, data }, { status })
-}
-
-export const fail = (msg: string, status: number = 400) => {
-  return Response.json({ ok: false, msg }, { status })
-}
-
-export const unauthorized = () => fail('Unauthorized', 401)
-
-export const serverError = (err: any) => {
-  console.error(err)
-  return fail('Server error', 500)
-}
-
-export const validationError = (msg: string) => fail(msg, 422)
-export function success(data: any = null, message: string = '') {
-  return Response.json(
-    { status: 'success', message, data },
     { status: 200 }
   )
 }
 
-export function created(data: any = null, message: string = 'Created successfully') {
-  return Response.json(
-    { status: 'success', message, data },
+export function created<T = any>(
+  data?: T,
+  message: string = 'تم الإنشاء بنجاح'
+): NextResponse<ApiResponse<T>> {
+  return NextResponse.json(
+    {
+      status: 'success',
+      message,
+      data,
+    },
     { status: 201 }
   )
 }
 
-export function badRequest(message: string = 'Bad request') {
-  return Response.json(
-    { status: 'error', message },
+// Error Responses
+export function badRequest(
+  message: string = 'طلب غير صالح'
+): NextResponse<ApiResponse> {
+  return NextResponse.json(
+    {
+      status: 'error',
+      message,
+    },
     { status: 400 }
   )
 }
 
-export function unauthorized(message: string = 'Unauthorized') {
-  return Response.json(
-    { status: 'error', message },
+export function unauthorized(
+  message: string = 'غير مصرح بالوصول'
+): NextResponse<ApiResponse> {
+  return NextResponse.json(
+    {
+      status: 'error',
+      message,
+    },
     { status: 401 }
   )
 }
 
-export function forbidden(message: string = 'Forbidden') {
-  return Response.json(
-    { status: 'error', message },
+export function forbidden(
+  message: string = 'ممنوع الوصول'
+): NextResponse<ApiResponse> {
+  return NextResponse.json(
+    {
+      status: 'error',
+      message,
+    },
     { status: 403 }
   )
 }
 
-export function notFound(message: string = 'Resource not found') {
-  return Response.json(
-    { status: 'error', message },
+export function notFound(
+  message: string = 'المورد غير موجود'
+): NextResponse<ApiResponse> {
+  return NextResponse.json(
+    {
+      status: 'error',
+      message,
+    },
     { status: 404 }
   )
 }
 
-export function conflict(message: string = 'Conflict') {
-  return Response.json(
-    { status: 'error', message },
+export function conflict(
+  message: string = 'تعارض في البيانات'
+): NextResponse<ApiResponse> {
+  return NextResponse.json(
+    {
+      status: 'error',
+      message,
+    },
     { status: 409 }
   )
 }
 
-export function serverError(message: string = 'Internal server error') {
-  return Response.json(
-    { status: 'error', message },
+export function validationError(
+  errors: Record<string, string[]> | string[]
+): NextResponse<ApiResponse> {
+  const message = Array.isArray(errors) 
+    ? 'خطأ في التحقق من البيانات'
+    : 'خطأ في التحقق من البيانات'
+
+  return NextResponse.json(
+    {
+      status: 'error',
+      message,
+      data: { errors },
+    },
+    { status: 422 }
+  )
+}
+
+export function serverError(
+  message: string = 'خطأ داخلي في الخادم',
+  error?: any
+): NextResponse<ApiResponse> {
+  if (process.env.NODE_ENV === 'development' && error) {
+    console.error('Server Error:', error)
+  }
+
+  return NextResponse.json(
+    {
+      status: 'error',
+      message,
+    },
     { status: 500 }
   )
+}
+
+// Pagination Helper
+export function withPagination<T>(
+  data: T[],
+  page: number,
+  limit: number,
+  total: number
+): ApiResponse<T[]> {
+  return {
+    status: 'success',
+    message: 'تم جلب البيانات بنجاح',
+    data,
+    meta: {
+      page,
+      limit,
+      total,
+      pages: Math.ceil(total / limit),
+    },
+  }
+}
+
+// Type Guard for Error Handling
+export function isApiError(error: any): error is ApiResponse {
+  return error && typeof error === 'object' && 'status' in error && 'message' in error
+}
+
+// Helper to extract error message
+export function getErrorMessage(error: any): string {
+  if (isApiError(error)) {
+    return error.message
+  }
+  
+  if (error instanceof Error) {
+    return error.message
+  }
+  
+  if (typeof error === 'string') {
+    return error
+  }
+  
+  return 'حدث خطأ غير متوقع'
 }
