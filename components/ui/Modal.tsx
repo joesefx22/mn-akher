@@ -1,52 +1,123 @@
 'use client'
 
-import { ReactNode } from 'react'
+import { ReactNode, useEffect } from 'react'
 import { X } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface ModalProps {
   isOpen: boolean
   onClose: () => void
-  title: string
+  title?: string
   children: ReactNode
-  size?: 'sm' | 'md' | 'lg' | 'xl'
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'full'
+  closeOnOverlayClick?: boolean
+  showCloseButton?: boolean
+  footer?: ReactNode
+  hideHeader?: boolean
+  className?: string
 }
 
-export default function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
+export default function Modal({ 
+  isOpen, 
+  onClose, 
+  title, 
+  children, 
+  size = 'md',
+  closeOnOverlayClick = true,
+  showCloseButton = true,
+  footer,
+  hideHeader = false,
+  className
+}: ModalProps) {
+  
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose()
+      }
+    }
+    
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape)
+      document.body.style.overflow = 'hidden'
+    }
+    
+    return () => {
+      document.removeEventListener('keydown', handleEscape)
+      document.body.style.overflow = 'unset'
+    }
+  }, [isOpen, onClose])
+  
   if (!isOpen) return null
   
   const sizes = {
-    sm: 'max-w-md',
-    md: 'max-w-lg',
-    lg: 'max-w-2xl',
-    xl: 'max-w-4xl'
+    xs: 'max-w-md',
+    sm: 'max-w-lg',
+    md: 'max-w-2xl',
+    lg: 'max-w-4xl',
+    xl: 'max-w-6xl',
+    full: 'max-w-full mx-4'
   }
   
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-4">
-        {/* Backdrop */}
-        <div 
-          className="fixed inset-0 bg-black/50 transition-opacity"
-          onClick={onClose}
-        />
-        
+    <div className="fixed inset-0 z-[100] overflow-y-auto">
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
+        onClick={closeOnOverlayClick ? onClose : undefined}
+        aria-hidden="true"
+      />
+      
+      <div className="flex min-h-full items-center justify-center p-4">
         {/* Modal */}
-        <div className={`relative w-full ${sizes[size]} rounded-xl bg-white shadow-2xl`}>
+        <div 
+          className={cn(
+            "relative w-full rounded-2xl bg-white shadow-2xl transform transition-all",
+            sizes[size],
+            className
+          )}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={title ? "modal-title" : undefined}
+        >
           {/* Header */}
-          <div className="flex items-center justify-between border-b p-6">
-            <h3 className="text-xl font-bold text-gray-900">{title}</h3>
-            <button
-              onClick={onClose}
-              className="rounded-lg p-1 hover:bg-gray-100"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
+          {!hideHeader && (title || showCloseButton) && (
+            <div className="flex items-center justify-between border-b border-gray-100 p-6">
+              {title && (
+                <h3 
+                  id="modal-title"
+                  className="text-xl font-bold text-gray-900"
+                >
+                  {title}
+                </h3>
+              )}
+              
+              {showCloseButton && (
+                <button
+                  onClick={onClose}
+                  className="ml-auto rounded-lg p-2 hover:bg-gray-100 transition-colors"
+                  aria-label="إغلاق"
+                >
+                  <X className="h-5 w-5 text-gray-500" />
+                </button>
+              )}
+            </div>
+          )}
           
           {/* Content */}
-          <div className="p-6">
+          <div className={cn(
+            "p-6",
+            !hideHeader && (title || showCloseButton) && "pt-4"
+          )}>
             {children}
           </div>
+          
+          {/* Footer */}
+          {footer && (
+            <div className="border-t border-gray-100 bg-gray-50/50 p-6 rounded-b-2xl">
+              {footer}
+            </div>
+          )}
         </div>
       </div>
     </div>
