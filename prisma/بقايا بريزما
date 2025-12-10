@@ -1,0 +1,34 @@
+model Field {
+  id           String      @id @default(uuid())
+  // ... حقول أخرى
+  
+  // إعدادات الوقت
+  openHour    String       // مثال: "06:00"
+  closeHour   String       // مثال: "23:00"
+  activeDays  Int[]        // [0,1,2,3,4,5,6] حيث 0=الأحد
+  
+  // علاقات
+  schedules    FieldSchedule[]
+  bookings     Booking[]
+}
+
+model TimeSlot {
+  id    String @id @default(uuid())
+  start String // "17:00"
+  end   String // "18:00"
+  label String @unique
+
+  schedules FieldSchedule[]
+  bookings  Booking[]
+}
+
+model FieldSchedule {
+  id        String   @id @default(uuid())
+  fieldId   String
+  field     Field    @relation(fields: [fieldId], references: [id])
+  slotId    String
+  slot      TimeSlot @relation(fields: [slotId], references: [id])
+  weekday   Int?     // 0..6 أو null = كل الأيام
+
+  @@unique([fieldId, slotId, weekday])
+}
