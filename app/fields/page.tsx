@@ -3,21 +3,16 @@ import FieldsList from './FieldsList';
 
 const prisma = new PrismaClient();
 
-interface PageProps {
-  searchParams: {
-    type?: string;
-    area?: string;
-    q?: string;
-    page?: string;
-  };
-}
-
-export default async function FieldsPage({ searchParams }: PageProps) {
+export default async function FieldsPage({
+  searchParams
+}: {
+  searchParams: { [key: string]: string | undefined }
+}) {
   const page = parseInt(searchParams.page || '1');
   const limit = 12;
   const skip = (page - 1) * limit;
-
-  // بناء query بناءً على الفلاتر
+  
+  // بناء query من searchParams
   const where: any = {};
   
   if (searchParams.type && searchParams.type !== 'ALL') {
@@ -31,20 +26,17 @@ export default async function FieldsPage({ searchParams }: PageProps) {
   if (searchParams.q) {
     where.OR = [
       { name: { contains: searchParams.q, mode: 'insensitive' } },
-      { location: { contains: searchParams.q, mode: 'insensitive' } },
-      { description: { contains: searchParams.q, mode: 'insensitive' } }
+      { location: { contains: searchParams.q, mode: 'insensitive' } }
     ];
   }
-
+  
   // جلب البيانات من قاعدة البيانات
   const [fields, total, areas] = await Promise.all([
     prisma.field.findMany({
       where,
       include: {
         area: true,
-        owner: {
-          select: { id: true, name: true }
-        }
+        owner: { select: { id: true, name: true } }
       },
       skip,
       take: limit,
@@ -53,28 +45,16 @@ export default async function FieldsPage({ searchParams }: PageProps) {
     
     prisma.field.count({ where }),
     
-    prisma.area.findMany({
-      select: { id: true, name: true }
-    })
+    prisma.area.findMany()
   ]);
-
-  const totalPages = Math.ceil(total / limit);
 
   return (
     <FieldsList
-      fields={fields}
+      initialFields={fields}
       areas={areas}
-      pagination={{
-        current: page,
-        total: totalPages,
-        hasNext: page < totalPages,
-        hasPrev: page > 1
-      }}
-      filters={{
-        type: searchParams.type || 'ALL',
-        area: searchParams.area || 'ALL',
-        search: searchParams.q || ''
-      }}
+      total={total}
+      currentPage={page}
+      filters={searchParams}
     />
   );
 }
