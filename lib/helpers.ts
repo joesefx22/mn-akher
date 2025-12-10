@@ -1,6 +1,228 @@
 import bcrypt from 'bcryptjs'
 import prisma from './prisma'
+import { prisma } from './prisma';
 
+/**
+ * توليد جميع الساعات الممكنة من openHour إلى closeHour
+ */
+export function generateTimeSlots(
+  openHour: string,    // "06:00"
+  closeHour: string,   // "23:00"
+  duration: number = 1 // مدة الساعة بالدقائق
+): { start: string; end: string; label: string }[] {
+  const slots: { start: string; end: string; label: string }[] = [];
+  
+  const [openH, openM] = openHour.split(':').map(Number);
+  const [closeH, closeM] = closeHour.split(':').map(Number);
+  
+  let currentHour = openH;
+  let currentMinute = openM;
+  
+  while (
+    currentHour < closeH || 
+    (currentHour === closeH && currentMinute < closeM)
+  ) {
+    const start = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
+    
+    // حساب وقت النهاية
+    let endHour = currentHour;
+    let endMinute = currentMinute + duration * 60;
+    
+    while (endMinute >= 60) {
+      endHour += 1;
+      endMinute -= 60;
+    }
+    
+    const end = `${endHour.toString().padStart(2, '0')}:${endMinute.toString().padStart(2, '0')}`;
+    
+    // التحقق أن وقت النهاية ليس بعد closeHour
+    if (
+      endHour > closeH || 
+      (endHour === closeH && endMinute > closeM)
+    ) {
+      break;
+    }
+    
+    slots.push({
+      start,
+      end,
+      label: `${start} - ${end}`
+    });
+    
+    // الانتقال للساعة التالية
+    currentHour = endHour;
+    currentMinute = endMinute;
+  }
+  
+  return slots;
+}
+
+/**
+ * التحقق إذا كان اليوم نشط للملعب
+ */
+export function isFieldActiveOnDay(field: any, date: Date): boolean {
+  const dayOfWeek = date.getDay(); // 0 = الأحد
+  return field.activeDays.includes(dayOfWeek);
+}
+
+/**
+ * جلب الساعات المتاحة لملعب في تاريخ معين
+ */
+export async function getAvailableSlots(
+  fieldId: string,
+  date: Date
+): Promise<{
+  slotId: string;
+  start: string;
+  end: string;
+  label: string;
+  status: 'available' | 'booked' | 'unavailable';
+  price: number;
+}[]> {
+  // 1. جلب بيانات الملعب
+  const field = await prisma.field.findUnique({
+    where: { id: fieldId },
+    include: {
+      schedules: {
+        include: {
+          slot: true
+        }
+      }
+    }
+  });
+
+  if (!field) {
+    throw new Error('الملعب غير موجود');
+  }
+
+  // 2. التحقق إذا كان اليوم نشط
+  const dayOfWeek = date.getDay();
+  const isActive = field.activeDays.includes(dayOfWeek);
+  
+  if (!isActive) {
+    return []; // الملعب غير متاح في هذا اليوم
+  }
+
+  // 3. جلب الحجوزات لهذا التاريخ
+  const bookings = await prisma.booking.findMany({
+    where: {
+      fieldId,
+      date: {
+        gte: new Date(date.setHours(0, 0, 0, 0)),
+        lt: new Date(date.setHours(23, 59, 59, 999))
+      },
+      status: {
+        in: ['CONFIRMED', 'PENDING']
+      }
+    },
+    include: {
+      slot: true
+    }
+  });
+
+  // 4. توليد الساعات المتاحة
+  const allSlots = generateTimeSlots(field.openHour, field.closeHour);
+  
+  // 5. الربط مع بيانات قاعدة البيانات
+  const availableSlots = await Promise.all(
+    allSlots.map(async (slot) => {
+      // البحث عن TimeSlot في قاعدة البيانات
+      let timeSlot = await prisma.timeSlot.findUnique({
+        where: {
+          start_end: {
+            start: slot.start,
+            end: slot.end
+          }
+        }
+      });
+
+      // إذا لم يكن موجود، ننشئه
+      if (!timeSlot) {
+        timeSlot = await prisma.timeSlot.create({
+          data: {
+            start: slot.start,
+            end: slot.end,
+            label: slot.label
+          }
+        });
+      }
+
+      // التحقق إذا كان الحجز متاح لهذا اليوم
+      const scheduleExists = field.schedules.some(
+        s => s.slotId === timeSlot!.id && (s.weekday === null || s.weekday === dayOfWeek)
+      );
+
+      // التحقق إذا كان محجوز
+      const isBooked = bookings.some(
+        b => b.slot.start === slot.start && b.slot.end === slot.end
+      );
+
+      // تحديد السعر (يمكن إضافة منطق للأسعار الذروة)
+      const isPeakHour = parseInt(slot.start.split(':')[0]) >= 18;
+      const price = isPeakHour ? field.pricePerHour * 1.2 : field.pricePerHour;
+
+      return {
+        slotId: timeSlot.id,
+        start: slot.start,
+        end: slot.end,
+        label: slot.label,
+        status: !scheduleExists ? 'unavailable' : isBooked ? 'booked' : 'available',
+        price
+      };
+    })
+  );
+
+  return availableSlots;
+}
+
+/**
+ * إنشاء schedule للملعب (مرة واحدة عند إنشاء الملعب)
+ */
+export async function createFieldSchedule(fieldId: string) {
+  const field = await prisma.field.findUnique({
+    where: { id: fieldId }
+  });
+
+  if (!field) {
+    throw new Error('الملعب غير موجود');
+  }
+
+  const slots = generateTimeSlots(field.openHour, field.closeHour);
+  
+  // لكل يوم نشط، ننشئ schedule
+  for (const day of field.activeDays) {
+    for (const slot of slots) {
+      // البحث أو إنشاء TimeSlot
+      let timeSlot = await prisma.timeSlot.findUnique({
+        where: {
+          start_end: {
+            start: slot.start,
+            end: slot.end
+          }
+        }
+      });
+
+      if (!timeSlot) {
+        timeSlot = await prisma.timeSlot.create({
+          data: {
+            start: slot.start,
+            end: slot.end,
+            label: slot.label
+          }
+        });
+      }
+
+      // إنشاء FieldSchedule
+      await prisma.fieldSchedule.create({
+        data: {
+          fieldId,
+          slotId: timeSlot.id,
+          weekday: day
+        }
+      });
+    }
+  }
+}
 // Password Hashing
 const SALT_ROUNDS = 12
 
