@@ -20,67 +20,132 @@ Minimal, secure, production-ready defaults
 
 1 — هيكل المشروع (روت كامل وملفات)
 project-root/
-├─ package.json
-├─ next.config.js
-├─ tsconfig.json
-├─ .env
-├─ prisma/
-│   ├─ schema.prisma
-│   └─ seed.ts
-├─ app/
-│   ├─ layout.tsx
-│   ├─ page.tsx
-│   ├─ (auth)/
-│   │   ├─ login/page.tsx
-│   │   └─ register/page.tsx
-│   ├─ dashboard/
-│   │   ├─ player/page.tsx
-│   │   ├─ owner/page.tsx
-│   │   ├─ employee/page.tsx
-│   │   └─ admin/page.tsx
-│   ├─ fields/
-│   │   ├─ page.tsx            # /fields (cards + filters)
-│   │   └─ [id]/page.tsx       # /fields/[id] details + booking UI
-│   └─ my-bookings/page.tsx
-│
-├─ app/api/                      # Next.js Route Handlers (server)
-│   ├─ auth/
-│   │   ├─ register/route.ts
-│   │   └─ login/route.ts
-│   ├─ fields/
-│   │   ├─ list/route.ts
-│   │   ├─ details/route.ts      # GET /api/fields/details?id=
-│   │   ├─ create/route.ts
-│   │   └─ update/route.ts
-│   ├─ schedule/
-│   │   ├─ generate/route.ts
-│   │   └─ list/route.ts
-│   ├─ bookings/
-│   │   ├─ create/route.ts
-│   │   ├─ cancel/route.ts
-│   │   └─ list/route.ts
-│   └─ payments/
-│       └─ webhook/route.ts
-│
-├─ lib/
-│   ├─ prisma.ts
-│   ├─ auth.ts
-│   ├─ responses.ts
-│   └─ helpers.ts
-│
-├─ middleware.ts
-├─ components/
-│   ├─ layout/Header.tsx
-│   ├─ layout/Footer.tsx
-│   ├─ FieldCard.tsx
-│   ├─ BookingSlot.tsx
-│   └─ ui/Button.tsx
-│
-├─ context/
-│   └─ AuthContext.tsx
-├─ styles/globals.css
-└─ README.md
-
+├── app
+│   ├── (auth)
+│   │   ├── login
+│   │   │   └── page.tsx
+│   │   └── register
+│   │       └── page.tsx
+│   ├── api
+│   │   ├── admin
+│   │   │   ├── manage-users
+│   │   │   │   └── route.ts
+│   │   │   ├── reports
+│   │   │   │   └── route.ts
+│   │   │   └── stats
+│   │   │       └── route.ts
+│   │   ├── areas
+│   │   │   └── list
+│   │   │       └── route.ts
+│   │   ├── auth
+│   │   │   ├── login
+│   │   │   │   └── route.ts
+│   │   │   ├── logout
+│   │   │   │   └── route.ts
+│   │   │   ├── me
+│   │   │   │   └── route.ts
+│   │   │   ├── refresh
+│   │   │   │   └── route.ts
+│   │   │   └── register
+│   │   │       └── route.ts
+│   │   ├── bookings
+│   │   │   ├── [id]
+│   │   │   │   └── route.ts
+│   │   │   ├── accept
+│   │   │   │   └── route.ts
+│   │   │   ├── cancel
+│   │   │   │   └── route.ts
+│   │   │   ├── create
+│   │   │   │   └── route.ts
+│   │   │   ├── list
+│   │   │   │   └── route.ts
+│   │   │   └── reject
+│   │   │       └── route.ts
+│   │   ├── employee
+│   │   │   ├── dashboard
+│   │   │   │   └── route.ts
+│   │   │   └── manage-bookings
+│   │   │       └── route.ts
+│   │   ├── fields
+│   │   │   ├── create
+│   │   │   │   └── route.ts
+│   │   │   ├── details
+│   │   │   │   └── route.ts
+│   │   │   ├── list
+│   │   │   │   └── route.ts
+│   │   │   └── update
+│   │   │       └── route.ts
+│   │   ├── owner
+│   │   │   └── fields
+│   │   │       └── route.ts
+│   │   ├── payments
+│   │   │   ├── create-session
+│   │   │   │   └── route.ts
+│   │   │   ├── initiate
+│   │   │   │   └── route.ts
+│   │   │   ├── mock-pay
+│   │   │   │   └── route.ts
+│   │   │   └── webhook
+│   │   │       └── route.ts
+│   │   ├── schedule
+│   │   │   ├── generate
+│   │   │   │   └── route.ts
+│   │   │   └── list
+│   │   │       └── route.ts
+│   │   └── users
+│   │       └── [id]
+│   │           └── route.ts
+│   ├── dashboard
+│   │   ├── admin
+│   │   │   └── page.tsx
+│   │   ├── employee
+│   │   │   └── page.tsx
+│   │   ├── owner
+│   │   │   ├── [id]
+│   │   │   │   └── page.tsx
+│   │   │   └── page.tsx
+│   │   └── player
+│   │       └── page.tsx
+│   ├── fields
+│   │   ├── [id]
+│   │   │   └── page.tsx
+│   │   └── page.tsx
+│   ├── globals.css
+│   ├── layout.tsx
+│   ├── my-bookings
+│   │   └── page.tsx
+│   └── page.tsx
+├── components
+│   ├── BookingSlot.tsx
+│   ├── FieldCard.tsx
+│   ├── layout
+│   │   ├── Footer.tsx
+│   │   └── Header.tsx
+│   └── ui
+│       ├── Button.tsx
+│       ├── Card.tsx
+│       ├── Input.tsx
+│       ├── LoadingSpinner.tsx
+│       ├── Modal.tsx
+│       └── Toast.tsx
+├── context
+│   └── AuthContext.tsx
+├── lib
+│   ├── auth.ts
+│   ├── helpers.ts
+│   ├── prisma.ts
+│   └── responses.ts
+├── middleware.ts
+├── next.config.js
+├── package.json
+├── postcss.config.js
+├── prisma
+│   ├── schema.prisma
+│   └── seed.ts
+├── tailwind.config.js
+├── tsconfig.json
+├── utils
+│   └── sendMail.js
 2 — قاعدة البيانات (Prisma schema) — نهائي PostgreSQL
 
 احفظ الملف prisma/schema.prisma كما يلي (مباشر وجاهز للـ Postgres):
