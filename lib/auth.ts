@@ -3,12 +3,39 @@ import bcrypt from 'bcryptjs'
 import { cookies } from 'next/headers'
 import { NextRequest } from 'next/server'
 import prisma from './prisma'
+import { USER_ROLES } from './constants'
+import { AppError, ErrorCode } from './errors'
+import logger from './logger'
+import env from './env'
 
 // Configuration
-const JWT_SECRET = process.env.JWT_SECRET!
-const ACCESS_TOKEN_EXPIRY = '15m'
-const REFRESH_TOKEN_EXPIRY = '7d'
+const JWT_SECRET = env.JWT_SECRET!
+const JWT_ACCESS_EXPIRY = env.JWT_ACCESS_EXPIRY || '15m'
+const JWT_REFRESH_EXPIRY = env.JWT_REFRESH_EXPIRY || '7d'
 const SALT_ROUNDS = 12
+
+// Types
+interface TokenPayload {
+  id: string
+  role: string
+  email: string
+  name: string
+  iat?: number
+  exp?: number
+}
+
+interface RefreshTokenPayload {
+  id: string
+  iat?: number
+  exp?: number
+}
+
+interface AuthUser {
+  id: string
+  name: string
+  email: string
+  role: string
+}
 
 // Password Hashing
 export async function hashPassword(password: string): Promise<string> {
@@ -23,58 +50,142 @@ export async function comparePasswords(
 }
 
 // Token Generation
-export function generateAccessToken(payload: { id: string; role: string }): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY })
-}
-
-export function generateRefreshToken(payload: { id: string }): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRY })
-}
-
-export function generateTokens(user: { id: string; role: string }) {
-  const accessToken = generateAccessToken({ id: user.id, role: user.role })
-  const refreshToken = generateRefreshToken({ id: user.id })
+export function generateAccessToken(user: AuthUser): string {
+  const payload: TokenPayload = {
+    id: user.id,
+    role: user.role,
+    email: user.email,
+    name: user.name,
+  }
   
-  return { accessToken, refreshToken }
+  return jwt.sign(payload, JWT_SECRET, { 
+    expiresIn: JWT_ACCESS_EXPIRY,
+    issuer: 'booking-system',
+    audience: 'user',
+  })
+}
+
+export function generateRefreshToken(userId: string): string {
+  return jwt.sign({ id: userId }, JWT_SECRET, { 
+    expiresIn: JWT_REFRESH_EXPIRY,
+    issuer: 'booking-system',
+    audience: 'refresh',
+  })
+}
+
+export function generateTokens(user: AuthUser): {
+  accessToken: string
+  refreshToken: string
+} {
+  return {
+    accessToken: generateAccessToken(user),
+    refreshToken: generateRefreshToken(user.id),
+  }
 }
 
 // Token Verification
-export function verifyToken(token: string): { id: string; role: string } | null {
+export function verifyAccessToken(token: string): TokenPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as { id: string; role: string }
+    return jwt.verify(token, JWT_SECRET, {
+      issuer: 'booking-system',
+      audience: 'user',
+    }) as TokenPayload
   } catch (error) {
+    if (error instanceof jwt.TokenExpiredError) {
+      logger.debug('Access token expired')
+    } else if (error instanceof jwt.JsonWebTokenError) {
+      logger.debug('Invalid access token')
+    }
     return null
   }
 }
 
-export function verifyRefreshToken(token: string): { id: string } | null {
+export function verifyRefreshToken(token: string): RefreshTokenPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as { id: string }
+    return jwt.verify(token, JWT_SECRET, {
+      issuer: 'booking-system',
+      audience: 'refresh',
+    }) as RefreshTokenPayload
   } catch (error) {
+    logger.debug('Invalid refresh token', { error: error.message })
     return null
   }
 }
 
-// Cookie Management (Server Side)
+// دالة موحدة للتحقق من التوكن
+export async function verifyToken(token: string): Promise<AuthUser | null> {
+  try {
+    const decoded = verifyAccessToken(token)
+    if (!decoded) {
+      return null
+    }
+
+    // التحقق من وجود المستخدم في قاعدة البيانات
+    const user = await prisma.user.findUnique({
+      where: { 
+        id: decoded.id,
+        deletedAt: null 
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+      }
+    })
+
+    if (!user) {
+      logger.warn('User not found for valid token', { userId: decoded.id })
+      return null
+    }
+
+    // التحقق من تطابق البيانات
+    if (user.email !== decoded.email || user.role !== decoded.role) {
+      logger.warn('Token data mismatch with database', {
+        token: { email: decoded.email, role: decoded.role },
+        db: { email: user.email, role: user.role },
+      })
+      return null
+    }
+
+    return user
+  } catch (error) {
+    logger.error('Token verification error', { error })
+    return null
+  }
+}
+
+// Cookie Management
 export async function setAuthCookies(
   accessToken: string,
   refreshToken: string
 ): Promise<void> {
   const cookieStore = await cookies()
   
+  // Access Token Cookie
   cookieStore.set('access_token', accessToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: env.isProduction(),
     sameSite: 'lax',
-    maxAge: 60 * 15, // 15 minutes
+    maxAge: 15 * 60, // 15 minutes in seconds
     path: '/',
   })
   
+  // Refresh Token Cookie
   cookieStore.set('refresh_token', refreshToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: env.isProduction(),
     sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 7, // 7 days
+    maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
+    path: '/',
+  })
+  
+  // Legacy token cookie for compatibility
+  cookieStore.set('token', accessToken, {
+    httpOnly: true,
+    secure: env.isProduction(),
+    sameSite: 'lax',
+    maxAge: 7 * 24 * 60 * 60, // 7 days for compatibility
     path: '/',
   })
 }
@@ -84,51 +195,45 @@ export async function clearAuthCookies(): Promise<void> {
   
   cookieStore.delete('access_token')
   cookieStore.delete('refresh_token')
-  
-  // Clear any old cookie names for backward compatibility
   cookieStore.delete('token')
 }
 
+export async function getAuthCookies(): Promise<{
+  accessToken?: string
+  refreshToken?: string
+  legacyToken?: string
+}> {
+  const cookieStore = await cookies()
+  
+  return {
+    accessToken: cookieStore.get('access_token')?.value,
+    refreshToken: cookieStore.get('refresh_token')?.value,
+    legacyToken: cookieStore.get('token')?.value,
+  }
+}
+
 // User Management
-export async function getCurrentUser(request?: NextRequest) {
+export async function getCurrentUser(request?: NextRequest): Promise<AuthUser | null> {
   try {
     let token: string | undefined
     
     if (request) {
-      // Get token from request cookies
-      token = request.cookies.get('access_token')?.value
+      // Get from request cookies
+      token = request.cookies.get('access_token')?.value || 
+              request.cookies.get('token')?.value
     } else {
-      // Get token from server cookies
-      const cookieStore = await cookies()
-      token = cookieStore.get('access_token')?.value
+      // Get from server cookies
+      const cookies = await getAuthCookies()
+      token = cookies.accessToken || cookies.legacyToken
     }
     
     if (!token) {
       return null
     }
     
-    const decoded = verifyToken(token)
-    if (!decoded) {
-      return null
-    }
-    
-    const user = await prisma.user.findUnique({
-      where: { 
-        id: decoded.id,
-        deletedAt: null // Exclude soft deleted users
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        createdAt: true,
-      }
-    })
-    
-    return user
+    return await verifyToken(token)
   } catch (error) {
-    console.error('Error getting current user:', error)
+    logger.error('Error getting current user', { error })
     return null
   }
 }
@@ -136,30 +241,42 @@ export async function getCurrentUser(request?: NextRequest) {
 export async function requireAuth(
   request: NextRequest,
   requiredRole?: string
-): Promise<{ user: any; error?: string }> {
+): Promise<{ user: AuthUser; error?: AppError }> {
   try {
     const user = await getCurrentUser(request)
     
     if (!user) {
       return { 
-        user: null, 
-        error: 'يجب تسجيل الدخول للوصول إلى هذا المورد' 
+        user: null as any, 
+        error: new AppError(
+          'يجب تسجيل الدخول للوصول إلى هذا المورد',
+          ErrorCode.UNAUTHORIZED,
+          401
+        )
       }
     }
     
     if (requiredRole && user.role !== requiredRole) {
       return { 
-        user: null, 
-        error: 'غير مصرح لك بالوصول إلى هذا المورد' 
+        user: null as any, 
+        error: new AppError(
+          'غير مصرح لك بالوصول إلى هذا المورد',
+          ErrorCode.FORBIDDEN,
+          403
+        )
       }
     }
     
     return { user }
   } catch (error) {
-    console.error('Auth requirement error:', error)
+    logger.error('Auth requirement error', { error })
     return { 
-      user: null, 
-      error: 'حدث خطأ في التحقق من الصلاحيات' 
+      user: null as any, 
+      error: new AppError(
+        'حدث خطأ في التحقق من الصلاحيات',
+        ErrorCode.INTERNAL_SERVER_ERROR,
+        500
+      )
     }
   }
 }
@@ -185,7 +302,12 @@ export async function refreshAccessToken(refreshToken: string): Promise<{
         id: decoded.id,
         deletedAt: null 
       },
-      select: { id: true, role: true }
+      select: { 
+        id: true, 
+        name: true,
+        email: true,
+        role: true 
+      }
     })
     
     if (!user) {
@@ -196,14 +318,13 @@ export async function refreshAccessToken(refreshToken: string): Promise<{
     }
     
     // Generate new access token
-    const accessToken = generateAccessToken({
-      id: user.id,
-      role: user.role
-    })
+    const accessToken = generateAccessToken(user)
+    
+    logger.debug('Access token refreshed', { userId: user.id })
     
     return { success: true, accessToken }
   } catch (error) {
-    console.error('Token refresh error:', error)
+    logger.error('Token refresh error', { error })
     return { 
       success: false, 
       error: 'حدث خطأ أثناء تجديد التوكن' 
@@ -211,72 +332,145 @@ export async function refreshAccessToken(refreshToken: string): Promise<{
   }
 }
 
-// Middleware Helper for API Routes
-export async function authenticateRequest(
-  request: NextRequest,
-  options?: {
-    requiredRole?: string
-    publicRoutes?: string[]
+// Authentication Flow
+export async function authenticateUser(
+  email: string,
+  password: string
+): Promise<{ success: boolean; user?: AuthUser; error?: string }> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { 
+        email,
+        deletedAt: null 
+      }
+    })
+    
+    if (!user) {
+      logger.warn('Login attempt with non-existent email', { email })
+      return { 
+        success: false, 
+        error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' 
+      }
+    }
+    
+    const isValidPassword = await comparePasswords(password, user.password)
+    
+    if (!isValidPassword) {
+      logger.warn('Login attempt with invalid password', { email })
+      return { 
+        success: false, 
+        error: 'البريد الإلكتروني أو كلمة المرور غير صحيحة' 
+      }
+    }
+    
+    // Return user without password
+    const { password: _, ...userWithoutPassword } = user
+    
+    logger.info('User authenticated successfully', { userId: user.id, email })
+    
+    return { 
+      success: true, 
+      user: userWithoutPassword as AuthUser 
+    }
+  } catch (error) {
+    logger.error('Authentication error', { email, error })
+    return { 
+      success: false, 
+      error: 'حدث خطأ أثناء المصادقة' 
+    }
   }
-): Promise<{
-  authenticated: boolean
-  user?: any
+}
+
+export async function registerUser(
+  name: string,
+  email: string,
+  password: string
+): Promise<{ success: boolean; user?: AuthUser; error?: string }> {
+  try {
+    // Check if user already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email }
+    })
+    
+    if (existingUser) {
+      return { 
+        success: false, 
+        error: 'البريد الإلكتروني مسجل بالفعل' 
+      }
+    }
+    
+    // Hash password
+    const hashedPassword = await hashPassword(password)
+    
+    // Create user
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+        role: USER_ROLES.USER,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true,
+      }
+    })
+    
+    logger.info('User registered successfully', { userId: user.id, email })
+    
+    return { 
+      success: true, 
+      user: user as AuthUser 
+    }
+  } catch (error) {
+    logger.error('Registration error', { email, error })
+    return { 
+      success: false, 
+      error: 'حدث خطأ أثناء إنشاء الحساب' 
+    }
+  }
+}
+
+// Password Reset
+export function generatePasswordResetToken(userId: string): string {
+  return jwt.sign(
+    { 
+      id: userId,
+      type: 'password_reset',
+      timestamp: Date.now() 
+    },
+    JWT_SECRET,
+    { expiresIn: '1h' }
+  )
+}
+
+export function verifyPasswordResetToken(token: string): {
+  valid: boolean
+  userId?: string
   error?: string
-  status?: number
-}> {
-  // Check if route is public
-  const pathname = request.nextUrl.pathname
-  if (options?.publicRoutes?.some(route => pathname.startsWith(route))) {
-    return { authenticated: true }
-  }
-  
-  const { user, error } = await requireAuth(request, options?.requiredRole)
-  
-  if (error) {
-    return {
-      authenticated: false,
-      error,
-      status: error.includes('يجب تسجيل الدخول') ? 401 : 403
+} {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as any
+    
+    if (decoded.type !== 'password_reset') {
+      return { valid: false, error: 'نوع التوكن غير صالح' }
     }
-  }
-  
-  return {
-    authenticated: true,
-    user
+    
+    // Check if token is expired (1 hour)
+    if (Date.now() - decoded.timestamp > 3600000) {
+      return { valid: false, error: 'انتهت صلاحية الرابط' }
+    }
+    
+    return { valid: true, userId: decoded.id }
+  } catch (error) {
+    return { valid: false, error: 'توكن غير صالح' }
   }
 }
 
-// Rate Limiting Helper
-export function createRateLimiter(
-  maxRequests: number = 100,
-  windowMs: number = 15 * 60 * 1000 // 15 minutes
-) {
-  const requests = new Map<string, { count: number; resetTime: number }>()
-  
-  return function isRateLimited(identifier: string): boolean {
-    const now = Date.now()
-    const userRequests = requests.get(identifier)
-    
-    if (!userRequests) {
-      requests.set(identifier, { count: 1, resetTime: now + windowMs })
-      return false
-    }
-    
-    if (now > userRequests.resetTime) {
-      requests.set(identifier, { count: 1, resetTime: now + windowMs })
-      return false
-    }
-    
-    if (userRequests.count >= maxRequests) {
-      return true
-    }
-    
-    userRequests.count++
-    return false
-  }
-}
-
-// Password Strength Checker
+// Security Utilities
 export function checkPasswordStrength(password: string): {
   score: number // 0-4
   strength: 'ضعيف' | 'متوسط' | 'جيد' | 'قوي' | 'قوي جداً'
@@ -285,7 +479,7 @@ export function checkPasswordStrength(password: string): {
   const feedback: string[] = []
   let score = 0
   
-  // Length check
+  // Length check (min 8)
   if (password.length >= 8) score++
   else feedback.push('يجب أن تكون كلمة المرور 8 أحرف على الأقل')
   
@@ -312,26 +506,25 @@ export function checkPasswordStrength(password: string): {
   return { score, strength, feedback }
 }
 
-// Generate Password Reset Token
-export function generatePasswordResetToken(): string {
-  const token = jwt.sign(
-    { 
-      type: 'password_reset',
-      timestamp: Date.now() 
-    },
-    JWT_SECRET,
-    { expiresIn: '1h' }
-  )
-  
-  return token
-}
-
-// Verify Password Reset Token
-export function verifyPasswordResetToken(token: string): boolean {
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any
-    return decoded.type === 'password_reset' && Date.now() - decoded.timestamp < 3600000 // 1 hour
-  } catch {
-    return false
+export function sanitizeUserData(user: any): AuthUser {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
   }
 }
+
+// Session Management
+export async function createUserSession(user: AuthUser) {
+  const tokens = generateTokens(user)
+  await setAuthCookies(tokens.accessToken, tokens.refreshToken)
+  return tokens
+}
+
+export async function destroyUserSession() {
+  await clearAuthCookies()
+}
+
+// Export types
+export type { AuthUser, TokenPayload, RefreshTokenPayload }
