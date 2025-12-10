@@ -1,3 +1,71 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { getAvailableSlots } from '@/lib/helpers';
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const fieldId = searchParams.get('id');
+    const dateParam = searchParams.get('date');
+
+    if (!fieldId) {
+      return NextResponse.json(
+        { message: 'معرف الملعب مطلوب' },
+        { status: 400 }
+      );
+    }
+
+    // تحليل التاريخ
+    const date = dateParam ? new Date(dateParam) : new Date();
+    date.setHours(0, 0, 0, 0);
+
+    // جلب بيانات الملعب
+    const field = await prisma.field.findUnique({
+      where: { id: fieldId },
+      include: {
+        area: true,
+        owner: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true
+          }
+        }
+      }
+    });
+
+    if (!field) {
+      return NextResponse.json(
+        { message: 'الملعب غير موجود' },
+        { status: 404 }
+      );
+    }
+
+    // جلب الساعات المتاحة
+    const availableSlots = await getAvailableSlots(fieldId, date);
+
+    return NextResponse.json({
+      status: 'success',
+      data: {
+        field,
+        availableSlots,
+        date: date.toISOString().split('T')[0]
+      }
+    });
+
+  } catch (error: any) {
+    console.error('Error in field details API:', error);
+    
+    return NextResponse.json(
+      { 
+        status: 'error',
+        message: error.message || 'حدث خطأ في الخادم'
+      },
+      { status: 500 }
+    );
+  }
+}
 import { NextRequest } from 'next/server'
 import prisma from '@/lib/prisma'
 import { success, fail } from '@/lib/responses'
