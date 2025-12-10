@@ -1,4 +1,71 @@
-// app/api/fields/create/route.js
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { createFieldSchedule } from '@/lib/helpers';
+import { getCurrentUser } from '@/lib/auth';
+
+export async function POST(request: NextRequest) {
+  try {
+    // التحقق من المصادقة
+    const user = await getCurrentUser(request);
+    if (!user || (user.role !== 'OWNER' && user.role !== 'ADMIN')) {
+      return NextResponse.json(
+        { message: 'غير مصرح لك' },
+        { status: 403 }
+      );
+    }
+
+    const data = await request.json();
+    
+    // التحقق من البيانات المطلوبة
+    const requiredFields = ['name', 'type', 'pricePerHour', 'areaId', 'openHour', 'closeHour', 'activeDays'];
+    for (const field of requiredFields) {
+      if (!data[field]) {
+        return NextResponse.json(
+          { message: `حقل ${field} مطلوب` },
+          { status: 400 }
+        );
+      }
+    }
+
+    // إنشاء الملعب
+    const field = await prisma.field.create({
+      data: {
+        name: data.name,
+        type: data.type,
+        pricePerHour: parseFloat(data.pricePerHour),
+        location: data.location || '',
+        areaId: data.areaId,
+        ownerId: user.id,
+        image: data.image,
+        phone: data.phone,
+        description: data.description,
+        openHour: data.openHour,
+        closeHour: data.closeHour,
+        activeDays: data.activeDays
+      }
+    });
+
+    // إنشاء Schedule للملعب
+    await createFieldSchedule(field.id);
+
+    return NextResponse.json({
+      status: 'success',
+      message: 'تم إنشاء الملعب بنجاح',
+      data: { field }
+    });
+
+  } catch (error: any) {
+    console.error('Error creating field:', error);
+    
+    return NextResponse.json(
+      { 
+        status: 'error',
+        message: error.message || 'حدث خطأ في إنشاء الملعب'
+      },
+      { status: 500 }
+    );
+  }
+}// app/api/fields/create/route.js
 import prisma from "@/lib/prisma";
 import { verifyAuthToken } from "@/utils/auth";
 
