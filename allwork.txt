@@ -13,54 +13,62 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "typecheck": "tsc --noEmit",
-    "fix": "rm -rf node_modules/.prisma node_modules/@prisma && npx prisma generate"
+    "fix": "rm -rf node_modules/.prisma node_modules/@prisma && npx prisma generate",
+    "clean": "rm -rf node_modules .next .turbo"
   },
   "dependencies": {
-    "@hookform/resolvers": "^3.10.0",
-    "@prisma/client": "^5.10.2",
+    "@hookform/resolvers": "^3.3.2",
+    "@prisma/client": "^5.22.0",
     "@tailwindcss/aspect-ratio": "^0.4.2",
     "@tailwindcss/forms": "^0.5.11",
     "@tailwindcss/typography": "^0.5.19",
     "@upstash/redis": "^1.36.1",
-    "axios": "^1.13.2",
+    "axios": "^1.6.2",
     "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
-    "dotenv": "^16.6.1",
-    "lucide-react": "^0.447.0",
-    "next": "^15.5.9",
-    "next-auth": "^4.24.13",
-    "pino": "^9.14.0",
-    "pino-pretty": "^11.3.0",
+    "dotenv": "^16.4.1",
+    "jose": "^5.6.3",
+    "lucide-react": "^0.344.0",
+    "next": "14.2.5",
+    "next-auth": "4.24.7",
+    "nodemailer": "^6.9.10",
+    "pino": "^9.3.1",
+    "pino-pretty": "^10.3.1",
     "rate-limiter-flexible": "^5.0.5",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-hook-form": "^7.71.0",
-    "react-hot-toast": "^2.6.0",
-    "react-icons": "^5.5.0",
-    "tailwind-merge": "^2.6.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-hook-form": "^7.51.3",
+    "react-hot-toast": "^2.4.1",
+    "react-icons": "^5.0.1",
+    "tailwind-merge": "^2.2.1",
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^9.0.1",
-    "zod": "^3.25.76"
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
-    "@types/node": "^18.19.0",
-    "@types/react": "^18.3.27",
-    "@types/react-dom": "^18.3.7",
-    "@types/uuid": "^10.0.0",
-    "autoprefixer": "^10.4.23",
-    "eslint": "^8.57.0",
-    "eslint-config-next": "^15.5.9",
-    "postcss": "^8.5.6",
-    "prisma": "^5.10.2",
-    "tailwindcss": "^3.4.19",
-    "tsx": "^4.19.2",
-    "typescript": "^5.4.5"
+    "@types/node": "^20.19.29",
+    "@types/nodemailer": "^6.4.14",
+    "@types/react": "^18.2.56",
+    "@types/react-dom": "^18.2.19",
+    "@types/uuid": "^9.0.8",
+    "autoprefixer": "^10.4.16",
+    "eslint": "^8.56.0",
+    "eslint-config-next": "14.2.5",
+    "postcss": "^8.4.33",
+    "prisma": "^5.22.0",
+    "tailwindcss": "^3.4.1",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.7.0",
+    "typescript": "^5.9.3"
   },
   "engines": {
     "node": ">=18.17.0"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   }
 }
 generator client {
@@ -82,10 +90,11 @@ enum Role {
 }
 
 enum SkillLevel {
-  BEGINNER
-  INTERMEDIATE
-  ADVANCED
-  EXPERT
+  WEAK
+  AVERAGE
+  GOOD
+  EXCELLENT
+  LEGENDARY
 }
 
 enum FieldType {
@@ -163,47 +172,53 @@ enum AuditAction {
 //////////////////// USER ////////////////////
 
 model User {
+  // === المفاتيح الأساسية ===
   id            String   @id @default(cuid())
-  // Personal Info
+  
+  // === المعلومات الشخصية ===
   name          String
   email         String   @unique
-  passwordHash  String
-  phone         String?  @unique
+  passwordHash  String?
+  phoneNumber   String?  @unique
   dateOfBirth   DateTime?
   avatarUrl     String?
   bio           String?  @db.Text
+  age           Int?
+  description   String?  @db.Text
   
-  // Skills & Preferences
-  skillLevel    SkillLevel @default(BEGINNER)
+  // === المهارات ===
+  skillLevel    SkillLevel @default(AVERAGE)
   preferredPositions String[]
   
-  // Role & Permissions
+  // === الصلاحيات ===
   role          Role @default(PLAYER)
-  roleAssignedAt DateTime?
+  roleUpdatedAt DateTime?  // ✅ متوافق مع الكود (app/api/auth/register/route.ts)
   
-  // Auth & Security
+  // === الأمان والمصادقة ===
   emailVerified Boolean   @default(false)
   emailVerifiedAt DateTime?
+  isVerified     Boolean   @default(false)  // ✅ متوافق مع الكود (app/api/auth/me/route.ts)
   isActive      Boolean   @default(true)
-  lastLoginAt   DateTime?
+  lastLoginAt   DateTime?  // ✅ متوافق مع الكود (app/api/auth/me/route.ts)
   loginAttempts Int       @default(0)
   lockedUntil   DateTime?
   
-  // Timestamps
+  // === الطوابع الزمنية ===
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   deletedAt     DateTime?
   
-  // 🔗 Relations
-  bookings        Booking[]
-  lockedSlots     Slot[]       @relation("SlotLockedByUser")
-  notifications   Notification[]
-  reviews         Review[]
-  payments        Payment[]
-  auditLogs       AuditLog[]
+  // === العلاقات ===
+  slotsLocked   Slot[]    @relation("SlotLockedByUser")
+  payments      Payment[]
+  bookings      Booking[]
+  notifications Notification[]
+  reviews       Review[]
   idempotencyKeys IdempotencyKey[]
+  auditLogs     AuditLog[]
+  flaggedUsers  FlaggedUser[]
   
-  // Indexes
+  // === الفهارس ===
   @@index([email, isActive])
   @@index([role, isActive])
   @@index([createdAt])
@@ -213,49 +228,54 @@ model User {
 //////////////////// FIELD ////////////////////
 
 model Field {
+  // === المفاتيح الأساسية ===
   id          String   @id @default(cuid())
-  // Basic Info
+  
+  // === المعلومات الأساسية ===
   name        String
   description String?  @db.Text
   location    String
   address     String
   coordinates String?
   
-  // Type & Media
+  // === النوع والوسائط ===
   type        FieldType
-  mainImage   String?
+  mainImage   String?  // ✅ اسم متوافق مع المخطط
+  imageUrl    String?  // ✅ إضافة للحفاظ على التوافق مع الكود القديم
   gallery     String[]
   
-  // Pricing
+  // === التسعير ===
   pricePerHour    Decimal @db.Decimal(10, 2)
   depositAmount   Decimal @db.Decimal(10, 2) @default(0)
+  depositPrice    Decimal @db.Decimal(10, 2) @default(0)  // ✅ إضافة للحفاظ على التوافق مع الكود
   currency        String  @default("EGP")
   
-  // Schedule
+  // === الجدول الزمني ===
   openingTime     String  @default("08:00")
   closingTime     String  @default("22:00")
   slotDuration    Int     @default(60)
+  slotDurationMin Int     @default(60)  // ✅ إضافة للحفاظ على التوافق مع الكود
   
-  // Status & Facilities
+  // === الحالة والمرافق ===
   status          FieldStatus @default(OPEN)
   facilities      String[]
   capacity        Int?
   
-  // Contact
+  // === معلومات المالك ===
   ownerId         String?
   ownerEmail      String?
   ownerPhone      String?
   
-  // Timestamps
+  // === الطوابع الزمنية ===
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   
-  // 🔗 Relations
+  // === العلاقات ===
   slots    Slot[]
   bookings Booking[]
   reviews  Review[]
   
-  // Indexes
+  // === الفهارس ===
   @@index([location])
   @@index([type, status])
   @@index([pricePerHour])
@@ -265,39 +285,42 @@ model Field {
 //////////////////// SLOT ////////////////////
 
 model Slot {
+  // === المفاتيح الأساسية ===
   id      String   @id @default(cuid())
   
-  // Field Relation
+  // === العلاقة مع الملعب ===
   fieldId String
   field   Field  @relation(fields: [fieldId], references: [id], onDelete: Cascade)
   
-  // Timing
+  // === التوقيت ===
   startTime   DateTime
   endTime     DateTime
-  duration    Int     @default(60)
+  duration    Int     @default(60)  // ✅ متوافق مع المخطط
+  durationMinutes Int @default(60)  // ✅ إضافة للحفاظ على التوافق مع الكود
   
-  // Pricing
+  // === التسعير ===
   price       Decimal @db.Decimal(10, 2)
   deposit     Decimal @db.Decimal(10, 2) @default(0)
   
-  // Status & Locking
+  // === الحالة والقفل ===
   status      SlotStatus @default(AVAILABLE)
   lockedUntil DateTime?
   lockedById  String?
   lockedBy    User?     @relation("SlotLockedByUser", fields: [lockedById], references: [id], onDelete: SetNull)
+  lockedByUser User?    @relation("SlotLockedByUser", fields: [lockedById], references: [id], onDelete: SetNull)  // ✅ alias
   
-  // Metadata
+  // === البيانات الوصفية ===
   isPeakHour  Boolean @default(false)
   discount    Decimal @db.Decimal(5, 2) @default(0)
   
-  // Timestamps
+  // === الطوابع الزمنية ===
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
-  // 🔗 Relations
+  // === العلاقات ===
   bookings Booking[]
   
-  // Constraints & Indexes
+  // === القيود والفهارس ===
   @@unique([fieldId, startTime])
   @@index([status, lockedUntil])
   @@index([startTime, endTime])
@@ -308,53 +331,56 @@ model Slot {
 //////////////////// BOOKING ////////////////////
 
 model Booking {
+  // === المفاتيح الأساسية ===
   id String @id @default(cuid())
   
-  // User Relation
+  // === العلاقة مع المستخدم ===
   userId String
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  // Field & Slot Relations
+  // === العلاقة مع الملعب ===
   fieldId String
   field   Field @relation(fields: [fieldId], references: [id], onDelete: Cascade)
   
+  // === العلاقة مع الميعاد ===
   slotId String
   slot   Slot @relation(fields: [slotId], references: [id], onDelete: Cascade)
   
-  // Status
+  // === الحالة ===
   status        BookingStatus @default(DRAFT)
   paymentStatus PaymentStatus @default(PENDING)
   
-  // Pricing
+  // === التسعير ===
   totalAmount   Decimal @db.Decimal(10, 2)
   amountPaid    Decimal @db.Decimal(10, 2) @default(0)
   depositPaid   Decimal @db.Decimal(10, 2) @default(0)
   
-  // Payment & Order Info
+  // === معلومات الدفع والطلب ===
   orderId       String? @unique
-  paymentId     String?
+  paymentId     String? @unique
   gateway       String?
   
-  // Timing
+  // === التوقيت ===
   expiresAt       DateTime?
   confirmedAt     DateTime?
   cancelledAt     DateTime?
   completedAt     DateTime?
   
-  // Idempotency & Tracking
+  // === Idempotency والتتبع ===
   idempotencyKey String? @unique
   ipAddress      String?
   userAgent      String?
   
-  // Timestamps
+  // === الطوابع الزمنية ===
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
-  // 🔗 Relations
+  // === العلاقات ===
   payments      Payment[]
   notifications Notification[]
+  reviews       Review[]
   
-  // Indexes
+  // === الفهارس ===
   @@index([userId, status])
   @@index([slotId, status])
   @@index([orderId])
@@ -366,43 +392,45 @@ model Booking {
 //////////////////// PAYMENT ////////////////////
 
 model Payment {
+  // === المفاتيح الأساسية ===
   id String @id @default(cuid())
   
-  // Relations
+  // === العلاقات ===
   bookingId String
   booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   
   userId    String
   user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  // Amount & Currency
+  // === المبلغ والعملة ===
   amount      Decimal @db.Decimal(10, 2)
   currency    String  @default("EGP")
   feeAmount   Decimal @db.Decimal(10, 2) @default(0)
   netAmount   Decimal @db.Decimal(10, 2)
   
-  // Gateway Info
+  // === معلومات البوابة ===
   gateway       String
   gatewayId     String? @unique
   orderId       String? @unique
   transactionId String? @unique
+  paymentId     String? @unique
   
-  // Status
+  // === الحالة ===
   status      PaymentStatus @default(PENDING)
   refundedAmount Decimal @db.Decimal(10, 2) @default(0)
   
-  // Metadata
+  // === البيانات الوصفية ===
   metadata    Json?
   receiptUrl  String?
   errorMessage String?
   
-  // Timestamps
+  // === الطوابع الزمنية ===
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   paidAt      DateTime?
   refundedAt  DateTime?
   
-  // Indexes
+  // === الفهارس ===
   @@index([bookingId])
   @@index([userId])
   @@index([gatewayId])
@@ -413,35 +441,35 @@ model Payment {
 //////////////////// NOTIFICATION ////////////////////
 
 model Notification {
+  // === المفاتيح الأساسية ===
   id        String   @id @default(cuid())
   
-  // User Relation
+  // === العلاقات ===
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  // Optional Booking Relation
   bookingId String?
   booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   
-  // Content
+  // === المحتوى ===
   type    NotificationType
   title   String
   message String  @db.Text
   data    Json?
   
-  // Status
+  // === الحالة ===
   isRead    Boolean   @default(false)
   isSent    Boolean   @default(true)
   sentAt    DateTime  @default(now())
   
-  // Channels
+  // === القنوات ===
   sentVia   String[]
   
-  // Timestamps
+  // === الطوابع الزمنية ===
   createdAt DateTime @default(now())
   readAt    DateTime?
   
-  // Indexes
+  // === الفهارس ===
   @@index([userId, isRead])
   @@index([bookingId])
   @@index([type, createdAt])
@@ -451,9 +479,10 @@ model Notification {
 //////////////////// REVIEW ////////////////////
 
 model Review {
+  // === المفاتيح الأساسية ===
   id        String   @id @default(cuid())
   
-  // Relations
+  // === العلاقات ===
   fieldId   String
   field     Field    @relation(fields: [fieldId], references: [id], onDelete: Cascade)
   
@@ -463,20 +492,20 @@ model Review {
   bookingId String?
   booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   
-  // Review Content
+  // === محتوى المراجعة ===
   rating    Int      @default(5)
   title     String?
   comment   String?  @db.Text
   
-  // Metadata
+  // === البيانات الوصفية ===
   isVerified Boolean @default(false)
   helpfulVotes Int    @default(0)
   
-  // Timestamps
+  // === الطوابع الزمنية ===
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
-  // Constraints & Indexes
+  // === القيود والفهارس ===
   @@unique([fieldId, userId, bookingId])
   @@index([fieldId, rating])
   @@index([userId])
@@ -487,27 +516,28 @@ model Review {
 //////////////////// IDEMPOTENCY KEY ////////////////////
 
 model IdempotencyKey {
+  // === المفاتيح الأساسية ===
   id          String   @id @default(cuid())
   
-  // Key & User
+  // === المفتاح والمستخدم ===
   key         String
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  // Request Info
+  // === معلومات الطلب ===
   requestHash String
   method      String
-  path        String
+  path        String  // ✅ متوافق مع الكود (idempotency-guard.ts)
   response    Json?
   
-  // Expiry
+  // === انتهاء الصلاحية ===
   expiresAt   DateTime
   
-  // Timestamps
+  // === الطوابع الزمنية ===
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
-  // Constraints
+  // === القيود ===
   @@unique([key, userId])
   @@index([expiresAt])
   @@map("idempotency_keys")
@@ -516,34 +546,35 @@ model IdempotencyKey {
 //////////////////// AUDIT LOG ////////////////////
 
 model AuditLog {
+  // === المفاتيح الأساسية ===
   id String @id @default(cuid())
   
-  // User
+  // === المستخدم ===
   userId String?
   user   User? @relation(fields: [userId], references: [id], onDelete: SetNull)
   
-  // Action Details
+  // === تفاصيل الإجراء ===
   action     AuditAction
   entityType String?
   entityId   String?
   
-  // Changes
+  // === التغييرات ===
   oldData    Json?
   newData    Json?
   
-  // Request Info
+  // === معلومات الطلب ===
   ipAddress  String?
   userAgent  String?
   endpoint   String?
   
-  // Metadata
+  // === البيانات الوصفية ===
   success    Boolean @default(true)
   errorMessage String?
   
-  // Timestamps
+  // === الطوابع الزمنية ===
   createdAt DateTime @default(now())
   
-  // Indexes
+  // === الفهارس ===
   @@index([userId, createdAt])
   @@index([action, entityType])
   @@index([createdAt])
@@ -553,85 +584,245 @@ model AuditLog {
 //////////////////// FLAGGED USER ////////////////////
 
 model FlaggedUser {
+  // === المفاتيح الأساسية ===
   id     String @id @default(cuid())
   
-  // User
+  // === المستخدم ===
   userId String
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
   
-  // Flag Details
+  // === تفاصيل العلم ===
   reason    String   @db.Text
   category  String
   severity  String   @default("MEDIUM")
   
-  // Resolution
+  // === الحل ===
   resolved   Boolean  @default(false)
   resolvedAt DateTime?
   resolvedBy String?
   resolutionNote String? @db.Text
   
-  // Expiry
+  // === انتهاء الصلاحية ===
   expiresAt DateTime?
   
-  // Timestamps
+  // === الطوابع الزمنية ===
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
-  // Indexes
+  // === الفهارس ===
   @@index([userId, resolved])
   @@index([severity, createdAt])
   @@map("flagged_users")
 }
+// lib/shared/rate-limit/index.ts
+export class RateLimitService {
+  private requests = new Map<string, { count: number; resetTime: number }>();
 
-import { DefaultSession, DefaultUser } from "next-auth"
-import { JWT } from "next-auth/jwt"
+  check(key: string, limit: number, windowMs: number): boolean {
+    const now = Date.now();
+    const record = this.requests.get(key);
 
-export type SkillLevel = "WEAK" | "AVERAGE" | "GOOD" | "EXCELLENT" | "LEGENDARY"
+    if (!record || now > record.resetTime) {
+      // New window
+      this.requests.set(key, {
+        count: 1,
+        resetTime: now + windowMs
+      });
+      return true;
+    }
 
-declare module "next-auth" {
-  interface User extends DefaultUser {
-    id: string
-    role: "PLAYER" | "OWNER" | "EMPLOYEE" | "ADMIN"
-    email: string
-    name?: string | null
-    phoneNumber?: string | null
-    age?: number | null
-    description?: string | null
-    skillLevel?: SkillLevel
-    isActive?: boolean
-    isVerified?: boolean
-    lastLogin?: Date | null
-  }
+    if (record.count >= limit) {
+      return false;
+    }
 
-  interface Session {
-    user: {
-      id: string
-      role: "PLAYER" | "OWNER" | "EMPLOYEE" | "ADMIN"
-      email?: string | null
-      name?: string | null
-      phoneNumber?: string | null
-      age?: number | null
-      skillLevel?: SkillLevel
-      isActive?: boolean
-      isVerified?: boolean
-      lastLogin?: Date | null
-    } & DefaultSession["user"]
+    record.count++;
+    return true;
   }
 }
 
-declare module "next-auth/jwt" {
-  interface JWT {
-    id: string
-    role: "PLAYER" | "OWNER" | "EMPLOYEE" | "ADMIN"
-    phoneNumber?: string | null
-    skillLevel?: SkillLevel
-    isActive?: boolean
-    isVerified?: boolean
-    lastLogin?: Date | null
+export const rateLimitService = new RateLimitService();
+// lib/shared/logger/index.ts
+import pino from 'pino'
+
+// إنشاء logger أساسي
+export const logger = pino({
+  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+  transport: {
+    target: 'pino-pretty',
+    options: {
+      colorize: true,
+      translateTime: 'HH:MM:ss',
+      ignore: 'pid,hostname'
+    }
+  }
+})
+
+// Loggers متخصصة
+export const authLogger = logger.child({ module: 'auth' })
+export const bookingLogger = logger.child({ module: 'booking' })
+export const paymentLogger = logger.child({ module: 'payment' })
+export const apiLogger = logger.child({ module: 'api' })
+export const cronLogger = logger.child({ module: 'cron' })
+
+// دالة مساعدة للـ console.log في development
+export const devLogger = {
+  log: (...args: any[]) => {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[DEV]', ...args)
+    }
+  },
+  error: (...args: any[]) => {
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[DEV ERROR]', ...args)
+    }
+  },
+  warn: (...args: any[]) => {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[DEV WARN]', ...args)
+    }
   }
 }
-// lib/shared/utils/index.ts
+// lib/shared/helpers/index.ts
+import { type ClassValue, clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
 
+// 1. Utility Functions
+export function cn(...classes: (string | undefined | null | false)[]) {
+  return classes.filter(Boolean).join(" ");
+}
+
+export function cnMerge(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+
+// 2. Formatting Functions
+export function formatDate(date: Date | string): string {
+  const d = new Date(date)
+  return d.toLocaleDateString('ar-EG', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+export function formatRole(role: string): string {
+  const roleMap: Record<string, string> = {
+    PLAYER: '🎮 لاعب',
+    OWNER: '🏟️ مالك ملعب',
+    EMPLOYEE: '👨‍💼 موظف',
+    ADMIN: '🛡️ مدير'
+  }
+  return roleMap[role] || role
+}
+
+export function formatSkillLevel(skillLevel: string): string {
+  const skillMap: Record<string, string> = {
+    WEAK: 'ضعيف 😅',
+    AVERAGE: 'متوسط 😊',
+    GOOD: 'جيد 😎',
+    EXCELLENT: 'ممتاز 🔥',
+    LEGENDARY: 'أسطوري 👑'
+  }
+  return skillMap[skillLevel] || skillLevel
+}
+
+export function truncateText(text: string, maxLength: number = 50): string {
+  if (text.length <= maxLength) return text
+  return text.substring(0, maxLength) + '...'
+}
+
+export function formatNumber(num: number): string {
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1) + ' مليون'
+  }
+  if (num >= 1000) {
+    return (num / 1000).toFixed(1) + ' ألف'
+  }
+  return num.toString()
+}
+
+export function formatCurrency(amount: number): string {
+  return amount.toLocaleString('ar-EG') + ' ج.م'
+}
+
+export function getTimeAgo(date: Date | string): string {
+  const now = new Date()
+  const past = new Date(date)
+  const diffMs = now.getTime() - past.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return 'الآن'
+  if (diffMins < 60) return `قبل ${diffMins} دقيقة`
+  if (diffHours < 24) return `قبل ${diffHours} ساعة`
+  if (diffDays < 30) return `قبل ${diffDays} يوم`
+  if (diffDays < 365) return `قبل ${Math.floor(diffDays / 30)} شهر`
+  return `قبل ${Math.floor(diffDays / 365)} سنة`
+}
+
+export function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .map(word => word.charAt(0))
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
+}
+
+// 3. Validation Functions
+export function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return emailRegex.test(email)
+}
+
+export function isValidPhone(phone: string): boolean {
+  const phoneRegex = /^(\+?\d{1,3}[-.\s]?)?\(?\d{1,4}\)?[-.\s]?\d{1,4}[-.\s]?\d{1,9}$/
+  return phoneRegex.test(phone.replace(/\s/g, ''))
+}
+
+// 4. Math & Calculation Functions
+export function calculateAge(birthYear: number): number {
+  const currentYear = new Date().getFullYear()
+  return currentYear - birthYear
+}
+
+export function getGradientColor(level: string): string {
+  const gradientMap: Record<string, string> = {
+    WEAK: 'from-gray-400 to-gray-500',
+    AVERAGE: 'from-blue-400 to-blue-500',
+    GOOD: 'from-green-400 to-green-500',
+    EXCELLENT: 'from-purple-400 to-purple-500',
+    LEGENDARY: 'from-orange-400 to-orange-500'
+  }
+  return gradientMap[level] || 'from-gray-400 to-gray-500'
+}
+
+// 5. Helper Functions
+export function generateRandomId(length: number = 8): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+  let result = ''
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  return result
+}
+
+export function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout
+  
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeout)
+    timeout = setTimeout(() => func(...args), wait)
+  }
+}
+
+// 6. Constants (من الملف الآخر)
 export const ROLES = {
   PLAYER: 'PLAYER',
   OWNER: 'OWNER',
@@ -678,92 +869,23 @@ export const PASSWORD_POLICY = {
 
 export const RATE_LIMITS = {
   LOGIN: {
-    WINDOW_MS: 15 * 60 * 1000, // 15 minutes
+    WINDOW_MS: 15 * 60 * 1000,
     MAX_ATTEMPTS: 5
   },
   REGISTER: {
-    WINDOW_MS: 60 * 60 * 1000, // 1 hour
+    WINDOW_MS: 60 * 60 * 1000,
     MAX_ATTEMPTS: 3
   },
   FORGOT_PASSWORD: {
-    WINDOW_MS: 60 * 60 * 1000, // 1 hour
+    WINDOW_MS: 60 * 60 * 1000,
     MAX_ATTEMPTS: 3
   }
 } as const
 
-// ✅ أضف الـ cn هنا
-export function cn(...classes: (string | undefined | null | false)[]) {
-  return classes.filter(Boolean).join(" ");
-}
-// lib/shared/rate-limit/index.ts
-export class RateLimitService {
-  private requests = new Map<string, { count: number; resetTime: number }>();
-
-  check(key: string, limit: number, windowMs: number): boolean {
-    const now = Date.now();
-    const record = this.requests.get(key);
-
-    if (!record || now > record.resetTime) {
-      // New window
-      this.requests.set(key, {
-        count: 1,
-        resetTime: now + windowMs
-      });
-      return true;
-    }
-
-    if (record.count >= limit) {
-      return false;
-    }
-
-    record.count++;
-    return true;
-  }
-}
-
-export const rateLimitService = new RateLimitService();
-
-// lib/shared/logger/index.ts
-import pino from 'pino'
-
-// إنشاء logger أساسي
-export const logger = pino({
-  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
-  transport: {
-    target: 'pino-pretty',
-    options: {
-      colorize: true,
-      translateTime: 'HH:MM:ss',
-      ignore: 'pid,hostname'
-    }
-  }
-})
-
-// Loggers متخصصة
-export const authLogger = logger.child({ module: 'auth' })
-export const bookingLogger = logger.child({ module: 'booking' })
-export const paymentLogger = logger.child({ module: 'payment' })
-export const apiLogger = logger.child({ module: 'api' })
-export const cronLogger = logger.child({ module: 'cron' })
-
-// دالة مساعدة للـ console.log في development
-export const devLogger = {
-  log: (...args: any[]) => {
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[DEV]', ...args)
-    }
-  },
-  error: (...args: any[]) => {
-    if (process.env.NODE_ENV !== 'production') {
-      console.error('[DEV ERROR]', ...args)
-    }
-  },
-  warn: (...args: any[]) => {
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn('[DEV WARN]', ...args)
-    }
-  }
-}
+// Types
+export type RoleType = typeof ROLES[keyof typeof ROLES]
+export type TokenType = typeof TOKEN_TYPES[keyof typeof TOKEN_TYPES]
+export type ErrorCode = typeof ERROR_CODES[keyof typeof ERROR_CODES]
 // lib/shared/helpers/api-auth.ts
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/infrastructure/auth/auth-options'
@@ -855,208 +977,6 @@ export function requireActiveAccount(
 export async function getSessionForAPI() {
   return getServerSession(authOptions)
 }
-// lib/shared/helpers/index.ts
-import { type ClassValue, clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
-}
-
-export function formatDate(date: Date | string): string {
-  const d = new Date(date)
-  return d.toLocaleDateString('ar-EG', { // غيرتها لـ ar-EG
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
-export function formatRole(role: string): string {
-  const roleMap: Record<string, string> = {
-    PLAYER: '🎮 لاعب',
-    OWNER: '🏟️ مالك ملعب',
-    EMPLOYEE: '👨‍💼 موظف',
-    ADMIN: '🛡️ مدير'
-  }
-  return roleMap[role] || role
-}
-
-export function formatSkillLevel(skillLevel: string): string {
-  const skillMap: Record<string, string> = {
-    WEAK: 'ضعيف 😅',
-    AVERAGE: 'متوسط 😊',
-    GOOD: 'جيد 😎',
-    EXCELLENT: 'ممتاز 🔥',
-    LEGENDARY: 'أسطوري 👑'
-  }
-  return skillMap[skillLevel] || skillLevel
-}
-
-export function truncateText(text: string, maxLength: number = 50): string {
-  if (text.length <= maxLength) return text
-  return text.substring(0, maxLength) + '...'
-}
-
-export function isValidEmail(email: string): boolean {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  return emailRegex.test(email)
-}
-
-export function isValidPhone(phone: string): boolean {
-  // دعم للرقم المصري والعربي
-  const phoneRegex = /^(\+?\d{1,3}[-.\s]?)?\(?\d{1,4}\)?[-.\s]?\d{1,4}[-.\s]?\d{1,9}$/
-  return phoneRegex.test(phone.replace(/\s/g, ''))
-}
-
-export function debounce<T extends (...args: any[]) => any>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => void {
-  let timeout: NodeJS.Timeout
-  
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeout)
-    timeout = setTimeout(() => func(...args), wait)
-  }
-}
-
-export function generateRandomId(length: number = 8): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-  let result = ''
-  for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return result
-}
-
-export function getGradientColor(level: string): string {
-  const gradientMap: Record<string, string> = {
-    WEAK: 'from-gray-400 to-gray-500',
-    AVERAGE: 'from-blue-400 to-blue-500',
-    GOOD: 'from-green-400 to-green-500',
-    EXCELLENT: 'from-purple-400 to-purple-500',
-    LEGENDARY: 'from-orange-400 to-orange-500'
-  }
-  return gradientMap[level] || 'from-gray-400 to-gray-500'
-}
-
-export function calculateAge(birthYear: number): number {
-  const currentYear = new Date().getFullYear()
-  return currentYear - birthYear
-}
-
-export function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .map(word => word.charAt(0))
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
-}
-
-export function formatNumber(num: number): string {
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + ' مليون'
-  }
-  if (num >= 1000) {
-    return (num / 1000).toFixed(1) + ' ألف'
-  }
-  return num.toString()
-}
-
-export function formatCurrency(amount: number): string {
-  return amount.toLocaleString('ar-EG') + ' ج.م'
-}
-
-export function getTimeAgo(date: Date | string): string {
-  const now = new Date()
-  const past = new Date(date)
-  const diffMs = now.getTime() - past.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffMins < 1) return 'الآن'
-  if (diffMins < 60) return `قبل ${diffMins} دقيقة`
-  if (diffHours < 24) return `قبل ${diffHours} ساعة`
-  if (diffDays < 30) return `قبل ${diffDays} يوم`
-  if (diffDays < 365) return `قبل ${Math.floor(diffDays / 30)} شهر`
-  return `قبل ${Math.floor(diffDays / 365)} سنة`
-}
-import { z } from 'zod'
-
-const envSchema = z.object({
-  // === Database ===
-  DATABASE_URL: z.string()
-    .url()
-    .refine(url => url.startsWith('postgresql://'), {
-      message: 'DATABASE_URL must start with postgresql://'
-    }),
-  
-  // === NextAuth ===
-  NEXTAUTH_URL: z.string().url(),
-  NEXTAUTH_SECRET: z.string()
-    .min(32, 'NEXTAUTH_SECRET must be at least 32 characters'),
-  
-  // === Paymob ===
-  PAYMOB_API_KEY: z.string().min(1),
-  PAYMOB_HMAC_SECRET: z.string().min(1),
-  PAYMOB_INTEGRATION_ID: z.string().min(1),
-  PAYMOB_IFRAME_ID: z.string().default('default'),
-  
-  // === Cron ===
-  CRON_SECRET: z.string()
-    .min(32, 'CRON_SECRET must be at least 32 characters')
-    .default('dev-cron-secret-change-in-production'),
-  
-  // === App ===
-  APP_URL: z.string().url().default('http://localhost:3000'),
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  
-  // === Logging ===
-  LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error'])
-    .default('info'),
-  
-  // === Email (Optional) ===
-  RESEND_API_KEY: z.string().optional(),
-  EMAIL_FROM: z.string().email().optional(),
-  
-  // === Google OAuth (Optional) ===
-  GOOGLE_CLIENT_ID: z.string().optional(),
-  GOOGLE_CLIENT_SECRET: z.string().optional(),
-})
-
-// Validate env
-const env = envSchema.safeParse(process.env)
-
-if (!env.success) {
-  console.error('❌ Invalid environment variables:', env.error.flatten().fieldErrors)
-  
-  // في development نعطي defaults للمتغيرات المطلوبة
-  if (process.env.NODE_ENV === 'production') {
-    throw new Error('Invalid environment variables')
-  }
-  
-  console.warn('⚠️  Running with default environment variables for development')
-}
-
-export const ENV = env.success ? env.data : {
-  // Defaults for development
-  NODE_ENV: 'development' as const,
-  DATABASE_URL: process.env.DATABASE_URL || 'postgresql://localhost:5432/ihgezly',
-  NEXTAUTH_URL: process.env.NEXTAUTH_URL || 'http://localhost:3000',
-  NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || 'dev-secret-change-in-production-32-chars-min',
-  APP_URL: process.env.APP_URL || 'http://localhost:3000',
-  CRON_SECRET: process.env.CRON_SECRET || 'dev-cron-secret-change-in-production',
-  LOG_LEVEL: 'debug' as const,
-  PAYMOB_API_KEY: process.env.PAYMOB_API_KEY || 'mock_api_key',
-  PAYMOB_HMAC_SECRET: process.env.PAYMOB_HMAC_SECRET || 'mock_hmac_secret',
-  PAYMOB_INTEGRATION_ID: process.env.PAYMOB_INTEGRATION_ID || 'mock_integration_id',
-  PAYMOB_IFRAME_ID: process.env.PAYMOB_IFRAME_ID || 'default'
-}
 // lib/shared/env/startup-check.ts
 import { ENV } from './env'
 import { logger } from '@/lib/shared/logger'  // ✅ المسار الجديد
@@ -1147,7 +1067,77 @@ async function checkPaymob(): Promise<void> {
     logger.info('Paymob configuration check skipped (development)')
   }
 }
+import { z } from 'zod'
 
+const envSchema = z.object({
+  // === Database ===
+  DATABASE_URL: z.string()
+    .url()
+    .refine(url => url.startsWith('postgresql://'), {
+      message: 'DATABASE_URL must start with postgresql://'
+    }),
+  
+  // === NextAuth ===
+  NEXTAUTH_URL: z.string().url(),
+  NEXTAUTH_SECRET: z.string()
+    .min(32, 'NEXTAUTH_SECRET must be at least 32 characters'),
+  
+  // === Paymob ===
+  PAYMOB_API_KEY: z.string().min(1),
+  PAYMOB_HMAC_SECRET: z.string().min(1),
+  PAYMOB_INTEGRATION_ID: z.string().min(1),
+  PAYMOB_IFRAME_ID: z.string().default('default'),
+  
+  // === Cron ===
+  CRON_SECRET: z.string()
+    .min(32, 'CRON_SECRET must be at least 32 characters')
+    .default('dev-cron-secret-change-in-production'),
+  
+  // === App ===
+  APP_URL: z.string().url().default('http://localhost:3000'),
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  
+  // === Logging ===
+  LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error'])
+    .default('info'),
+  
+  // === Email (Optional) ===
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().email().optional(),
+  
+  // === Google OAuth (Optional) ===
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+})
+
+// Validate env
+const env = envSchema.safeParse(process.env)
+
+if (!env.success) {
+  console.error('❌ Invalid environment variables:', env.error.flatten().fieldErrors)
+  
+  // في development نعطي defaults للمتغيرات المطلوبة
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Invalid environment variables')
+  }
+  
+  console.warn('⚠️  Running with default environment variables for development')
+}
+
+export const ENV = env.success ? env.data : {
+  // Defaults for development
+  NODE_ENV: 'development' as const,
+  DATABASE_URL: process.env.DATABASE_URL || 'postgresql://localhost:5432/ihgezly',
+  NEXTAUTH_URL: process.env.NEXTAUTH_URL || 'http://localhost:3000',
+  NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || 'dev-secret-change-in-production-32-chars-min',
+  APP_URL: process.env.APP_URL || 'http://localhost:3000',
+  CRON_SECRET: process.env.CRON_SECRET || 'dev-cron-secret-change-in-production',
+  LOG_LEVEL: 'debug' as const,
+  PAYMOB_API_KEY: process.env.PAYMOB_API_KEY || 'mock_api_key',
+  PAYMOB_HMAC_SECRET: process.env.PAYMOB_HMAC_SECRET || 'mock_hmac_secret',
+  PAYMOB_INTEGRATION_ID: process.env.PAYMOB_INTEGRATION_ID || 'mock_integration_id',
+  PAYMOB_IFRAME_ID: process.env.PAYMOB_IFRAME_ID || 'default'
+}
 // lib/shared/context/request-context.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { v4 as uuidv4 } from 'uuid'
@@ -1256,86 +1246,128 @@ export function withRequestContext(
     })
   }
 }
-// lib/shared/constants/index.ts
+import { 
+  SlotStatus as PrismaSlotStatus,
+  BookingStatus as PrismaBookingStatus,
+  PaymentStatus as PrismaPaymentStatus,
+  FieldStatus as PrismaFieldStatus,
+  FieldType as PrismaFieldType,
+  NotificationType as PrismaNotificationType,
+  Role as PrismaRole,
+  SkillLevel as PrismaSkillLevel,
+  AuditAction as PrismaAuditAction
+} from '@prisma/client'
 
-// === حالة السلات (Slots) ===
-export const SLOT_STATUS = {
-  AVAILABLE: 'AVAILABLE',
-  TEMP_LOCKED: 'TEMP_LOCKED',
-  BOOKED: 'BOOKED',
-  UNAVAILABLE: 'UNAVAILABLE',
-  AVAILABLE_NEEDS_CONFIRM: 'AVAILABLE_NEEDS_CONFIRM'
+// Re-export من Prisma
+export const SLOT_STATUS = PrismaSlotStatus
+export const BOOKING_STATUS = PrismaBookingStatus
+export const PAYMENT_STATUS = PrismaPaymentStatus
+export const FIELD_STATUS = PrismaFieldStatus
+export const FIELD_TYPES = PrismaFieldType
+export const NOTIFICATION_TYPE = PrismaNotificationType
+export const USER_ROLES = PrismaRole
+export const SKILL_LEVELS = PrismaSkillLevel
+export const AUDIT_ACTIONS = PrismaAuditAction
+
+// إعادة تعريف للتوافق مع الكود القديم
+export const TOKEN_TYPES = {
+  EMAIL_VERIFICATION: 'EMAIL_VERIFICATION',
+  PASSWORD_RESET: 'PASSWORD_RESET',
+  REFRESH_TOKEN: 'REFRESH_TOKEN'
 } as const
 
-// === حالة الحجوزات (Bookings) ===
-export const BOOKING_STATUS = {
-  DRAFT: 'DRAFT',
-  PENDING_PAYMENT: 'PENDING_PAYMENT',
-  CONFIRMED: 'CONFIRMED',
-  CANCELLED: 'CANCELLED',
-  FAILED: 'FAILED',
-  EXPIRED: 'EXPIRED'
-} as const
-
-// === حالة المدفوعات (Payments) ===
-export const PAYMENT_STATUS = {
-  PENDING: 'PENDING',
-  PROCESSING: 'PROCESSING',
-  PAID: 'PAID',
-  FAILED: 'FAILED',
-  REFUNDED: 'REFUNDED',
-  PARTIALLY_REFUNDED: 'PARTIALLY_REFUNDED'
-} as const
-
-// === حالة الملاعب (Fields) ===
-export const FIELD_STATUS = {
-  OPEN: 'OPEN',
-  CLOSED: 'CLOSED',
-  MAINTENANCE: 'MAINTENANCE'
-} as const
-
-// === أنواع الملاعب ===
-export const FIELD_TYPES = {
-  FOOTBALL: 'FOOTBALL',
-  PADEL: 'PADEL',
-  TENNIS: 'TENNIS',
-  BASKETBALL: 'BASKETBALL'
-} as const
-
-// === أنواع الإشعارات ===
-export const NOTIFICATION_TYPE = {
-  PAYMENT_SUCCESS: 'PAYMENT_SUCCESS',
+export const ERROR_CODES = {
+  // الأخطاء الأساسية
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  AUTHENTICATION_ERROR: 'AUTHENTICATION_ERROR',
+  AUTHORIZATION_ERROR: 'AUTHORIZATION_ERROR',
+  NOT_FOUND: 'NOT_FOUND',
+  CONFLICT: 'CONFLICT',
+  RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
+  TOKEN_EXPIRED: 'TOKEN_EXPIRED',
+  INVALID_TOKEN: 'INVALID_TOKEN',
+  SERVER_ERROR: 'SERVER_ERROR',
+  
+  // أخطاء الملاعب
+  FIELD_NOT_FOUND: 'FIELD_NOT_FOUND',
+  FIELD_CLOSED: 'FIELD_CLOSED',
+  FIELD_MAINTENANCE: 'FIELD_MAINTENANCE',
+  
+  // أخطاء المواعيد
+  SLOT_NOT_FOUND: 'SLOT_NOT_FOUND',
+  SLOT_ALREADY_BOOKED: 'SLOT_ALREADY_BOOKED',
+  SLOT_UNAVAILABLE: 'SLOT_UNAVAILABLE',
+  SLOT_LOCKED_BY_OTHER: 'SLOT_LOCKED_BY_OTHER',
+  SLOT_CANNOT_BE_LOCKED: 'SLOT_CANNOT_BE_LOCKED',
+  SLOT_LOCK_EXPIRED: 'SLOT_LOCK_EXPIRED',
+  
+  // أخطاء الحجوزات
+  BOOKING_NOT_FOUND: 'BOOKING_NOT_FOUND',
+  BOOKING_NOT_OWNED: 'BOOKING_NOT_OWNED',
+  BOOKING_INVALID_STATE: 'BOOKING_INVALID_STATE',
+  BOOKING_IN_PROGRESS: 'BOOKING_IN_PROGRESS',
+  BOOKING_EXPIRED: 'BOOKING_EXPIRED',
+  BOOKING_LIMIT_EXCEEDED: 'BOOKING_LIMIT_EXCEEDED',
+  
+  // أخطاء الدفع
+  PAYMENT_ALREADY_PROCESSED: 'PAYMENT_ALREADY_PROCESSED',
   PAYMENT_FAILED: 'PAYMENT_FAILED',
-  BOOKING_CONFIRMED: 'BOOKING_CONFIRMED',
-  SLOT_REMINDER: 'SLOT_REMINDER'
+  DUPLICATE_PAYMENT: 'DUPLICATE_PAYMENT',
+  PAYMENT_NOT_FOUND: 'PAYMENT_NOT_FOUND',
+  
+  // أخطاء الوقت
+  TIME_IN_PAST: 'TIME_IN_PAST',
+  TIME_TOO_CLOSE: 'TIME_TOO_CLOSE',
+  INVALID_DATE: 'INVALID_DATE',
+  
+  // أخطاء التحقق
+  INVALID_INPUT: 'INVALID_INPUT',
+  MISSING_FIELD: 'MISSING_FIELD',
+  
+  // أخطاء المصادقة
+  UNAUTHORIZED: 'UNAUTHORIZED',
+  INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
+  SESSION_EXPIRED: 'SESSION_EXPIRED',
+  
+  // أخطاء النظام
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
+  SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE'
 } as const
 
-// === أدوار المستخدمين (User Roles) ===
-export const USER_ROLES = {
-  ADMIN: 'ADMIN',
-  PLAYER: 'PLAYER',
-  OWNER: 'OWNER',
-  EMPLOYEE: 'EMPLOYEE'
+export const PASSWORD_POLICY = {
+  MIN_LENGTH: 8,
+  REQUIRE_UPPERCASE: true,
+  REQUIRE_LOWERCASE: true,
+  REQUIRE_NUMBER: true,
+  REQUIRE_SPECIAL_CHAR: true
 } as const
 
-// === مهارات اللاعبين ===
-export const SKILL_LEVELS = {
-  WEAK: 'WEAK',
-  AVERAGE: 'AVERAGE',
-  GOOD: 'GOOD',
-  EXCELLENT: 'EXCELLENT',
-  LEGENDARY: 'LEGENDARY'
+export const RATE_LIMITS = {
+  LOGIN: {
+    WINDOW_MS: 15 * 60 * 1000,
+    MAX_ATTEMPTS: 5
+  },
+  REGISTER: {
+    WINDOW_MS: 60 * 60 * 1000,
+    MAX_ATTEMPTS: 3
+  },
+  FORGOT_PASSWORD: {
+    WINDOW_MS: 60 * 60 * 1000,
+    MAX_ATTEMPTS: 3
+  }
 } as const
 
-// === أنواع للمساعدة في TypeScript ===
-export type SlotStatus = typeof SLOT_STATUS[keyof typeof SLOT_STATUS]
-export type BookingStatus = typeof BOOKING_STATUS[keyof typeof BOOKING_STATUS]
-export type PaymentStatus = typeof PAYMENT_STATUS[keyof typeof PAYMENT_STATUS]
-export type FieldStatus = typeof FIELD_STATUS[keyof typeof FIELD_STATUS]
-export type FieldType = typeof FIELD_TYPES[keyof typeof FIELD_TYPES]
-export type NotificationType = typeof NOTIFICATION_TYPE[keyof typeof NOTIFICATION_TYPE]
-export type UserRole = typeof USER_ROLES[keyof typeof USER_ROLES]
-export type SkillLevel = typeof SKILL_LEVELS[keyof typeof SKILL_LEVELS]
+// Types للاستخدام في TypeScript
+export type SlotStatus = PrismaSlotStatus
+export type BookingStatus = PrismaBookingStatus
+export type PaymentStatus = PrismaPaymentStatus
+export type FieldStatus = PrismaFieldStatus
+export type FieldType = PrismaFieldType
+export type NotificationType = PrismaNotificationType
+export type UserRole = PrismaRole
+export type SkillLevel = PrismaSkillLevel
+export type TokenType = typeof TOKEN_TYPES[keyof typeof TOKEN_TYPES]
+export type ErrorCode = typeof ERROR_CODES[keyof typeof ERROR_CODES]
 // lib/shared/api/api-error-handler.ts
 import { NextResponse } from 'next/server'
 import { DomainError } from '@/lib/core/errors/domain-errors'
@@ -1692,7 +1724,6 @@ export class PaymobService {
 }
 
 export const paymobService = new PaymobService()
-
 // lib/infrastructure/payments/providers/index.ts
 export { paymobService } from './paymob'
 export { paymobHmacVerifier } from './hmac-verifier'
@@ -1841,22 +1872,10 @@ export const paymobHmacVerifier = new PaymobHmacVerifier()
 // lib/infrastructure/notifications/notification-service.ts
 import { prisma } from '@/lib/infrastructure/database/prisma'
 import { logger } from '@/lib/shared/logger'
+import { NotificationType as PrismaNotificationType } from '@prisma/client'
 
-// ✅ تعريف NotificationType محلياً
-export type NotificationType = 
-  | 'SYSTEM'
-  | 'BOOKING_CREATED'
-  | 'BOOKING_CONFIRMED'
-  | 'BOOKING_CANCELLED'
-  | 'BOOKING_EXPIRED'
-  | 'PAYMENT_INITIATED'
-  | 'PAYMENT_SUCCESS'
-  | 'PAYMENT_FAILED'
-  | 'PAYMENT_REFUNDED'
-  | 'SLOT_LOCKED'
-  | 'SLOT_RELEASED'
-  | 'USER_WELCOME'
-  | 'PASSWORD_RESET'
+// ✅ استخدام Prisma enum مباشرة
+export type NotificationType = PrismaNotificationType
 
 export interface NotificationParams {
   userId: string
@@ -1871,7 +1890,6 @@ export interface NotificationParams {
 export class NotificationService {
   async send(params: NotificationParams): Promise<void> {
     try {
-      // 1. Save to DB
       await prisma.notification.create({
         data: {
           userId: params.userId,
@@ -1886,7 +1904,6 @@ export class NotificationService {
         }
       })
 
-      // 2. Send via channels
       if (params.channel) {
         switch (params.channel) {
           case 'EMAIL':
@@ -1913,7 +1930,6 @@ export class NotificationService {
   }
 
   async sendEmail(params: NotificationParams): Promise<void> {
-    // TODO: Implement email sending
     logger.info({
       msg: 'Email notification would be sent',
       userId: params.userId,
@@ -1922,7 +1938,6 @@ export class NotificationService {
   }
 
   async sendSMS(params: NotificationParams): Promise<void> {
-    // TODO: Implement SMS sending
     logger.info({
       msg: 'SMS notification would be sent',
       userId: params.userId,
@@ -2115,7 +2130,6 @@ export type ChangePasswordInput = z.infer<typeof changePasswordSchema>
 export type RegisterFormInput = RegisterInput & {
   skillLevel: 'WEAK' | 'AVERAGE' | 'GOOD' | 'EXCELLENT' | 'LEGENDARY'
 }
-
 // lib/infrastructure/auth/responses.ts
 export interface ApiResponse<T = any> {
   success: boolean
@@ -2262,7 +2276,7 @@ import { prisma } from '@/lib/infrastructure/database/prisma'
 import { comparePassword } from '@/lib/infrastructure/security/password'
 import { z } from 'zod'
 import { authLogger } from '@/lib/shared/logger'
-import { USER_ROLES, UserRole } from '@/lib/shared/constants'
+import { Role, SkillLevel } from '@prisma/client'
 import { ENV } from '@/lib/shared/env/env'
 
 // Rate Limiter
@@ -2271,7 +2285,6 @@ const loginRateLimiter = new RateLimiterMemory({
   duration: 15 * 60,
 })
 
-// Validation schema for login
 const loginSchema = z.object({
   email: z.string().email('البريد الإلكتروني غير صالح'),
   password: z.string().min(1, 'كلمة المرور مطلوبة')
@@ -2341,7 +2354,7 @@ export const authOptions: NextAuthOptions = {
             data: {
               loginAttempts: 0,
               lockedUntil: null,
-              lastLogin: new Date()
+              lastLoginAt: new Date()
             }
           })
 
@@ -2351,9 +2364,14 @@ export const authOptions: NextAuthOptions = {
             id: user.id,
             name: user.name,
             email: user.email,
-            role: user.role as UserRole,
+            role: user.role as Role,
+            phoneNumber: user.phoneNumber,
+            age: user.age,
+            description: user.description,
+            skillLevel: user.skillLevel as SkillLevel,
             isActive: user.isActive,
-            isVerified: user.isVerified
+            isVerified: user.emailVerified,
+            lastLogin: user.lastLoginAt
           }
 
         } catch (error: any) {
@@ -2392,15 +2410,14 @@ export const authOptions: NextAuthOptions = {
                 email: normalizedEmail,
                 name: profile.name || profile.email.split('@')[0],
                 passwordHash: null,
-                role: USER_ROLES.PLAYER,
-                isActive: true,
-                isVerified: true,
-                lastLogin: new Date(),
-                phone: null,
                 phoneNumber: null,
                 age: null,
                 description: null,
-                skillLevel: 'AVERAGE'
+                skillLevel: 'AVERAGE',
+                role: 'PLAYER',
+                isActive: true,
+                emailVerified: true,
+                lastLoginAt: new Date()
               }
             })
             authLogger.info({ userId: user.id }, 'New OAuth user created')
@@ -2408,7 +2425,7 @@ export const authOptions: NextAuthOptions = {
             await prisma.user.update({
               where: { id: user.id },
               data: { 
-                lastLogin: new Date(),
+                lastLoginAt: new Date(),
                 name: profile.name || user.name
               }
             })
@@ -2425,9 +2442,14 @@ export const authOptions: NextAuthOptions = {
             id: user.id,
             name: user.name,
             email: user.email,
-            role: user.role as UserRole,
+            role: user.role as Role,
+            phoneNumber: user.phoneNumber,
+            age: user.age,
+            description: user.description,
+            skillLevel: user.skillLevel as SkillLevel,
             isActive: user.isActive,
-            isVerified: user.isVerified
+            isVerified: user.emailVerified,
+            lastLogin: user.lastLoginAt
           }
         } catch (error: any) {
           authLogger.error({ error }, 'OAuth profile error')
@@ -2447,8 +2469,13 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id
         token.role = (user as any).role
+        token.phoneNumber = (user as any).phoneNumber
+        token.age = (user as any).age
+        token.description = (user as any).description
+        token.skillLevel = (user as any).skillLevel
         token.isActive = (user as any).isActive
         token.isVerified = (user as any).isVerified
+        token.lastLogin = (user as any).lastLogin
       }
       return token
     },
@@ -2456,20 +2483,16 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string
-        session.user.role = token.role as UserRole
+        session.user.role = token.role as Role
+        session.user.phoneNumber = token.phoneNumber as string | null
+        session.user.age = token.age as number | null
+        session.user.description = token.description as string | null
+        session.user.skillLevel = token.skillLevel as SkillLevel
         session.user.isActive = token.isActive as boolean
         session.user.isVerified = token.isVerified as boolean
+        session.user.lastLogin = token.lastLogin as Date | null
       }
       return session
-    },
-
-    async signIn() {
-      try {
-        return true
-      } catch (error) {
-        authLogger.error({ error }, 'Sign in callback error')
-        return false
-      }
     },
 
     async redirect({ url, baseUrl }) {
@@ -2559,7 +2582,8 @@ export class SlotReadModel {
       metadata: {
         needsConfirmation,
         lockedUntil: dbSlot.lockedUntil ? new Date(dbSlot.lockedUntil) : undefined,
-        lockedByUserId: dbSlot.lockedByUserId
+        lockedById: null
+dbSlot.lockedByUserId
       }
     }
   }
@@ -2632,108 +2656,6 @@ export class SlotReadModel {
 
 export function getUISlots(slots: any[], userId?: string): UISlotView[] {
   return SlotReadModel.filterVisibleSlots(slots, userId)
-}
-//lib/domain/slots/time-slots/booking-limits.ts
-import { prisma } from '@/lib/infrastructure/database/prisma'
-import { startOfDay, addDays } from 'date-fns'
-import { DomainError } from '@/lib/core/errors/domain-errors'
-import { BOOKING_STATUS } from '@/lib/shared/constants'
-
-type BookingWithSlot = {
-  slot: {
-    startTime: Date
-    endTime: Date
-    durationMinutes: number | null
-  }
-}
-
-export async function checkBookingLimits({
-  userId,
-  slotDate,
-  slotDurationMin
-}: {
-  userId: string
-  slotDate: Date
-  slotDurationMin: number
-}) {
-  const dayStart = startOfDay(slotDate)
-  const dayEnd = addDays(dayStart, 1)
-
-  const dayOfWeek = dayStart.getDay()
-  const weekStart = addDays(dayStart, -dayOfWeek)
-  const weekEnd = addDays(weekStart, 7)
-
-  const dailyBookings: BookingWithSlot[] = await prisma.booking.findMany({
-    where: {
-      userId,
-      status: {
-        in: [BOOKING_STATUS.CONFIRMED, BOOKING_STATUS.PENDING_PAYMENT]
-      },
-      slot: {
-        startTime: { gte: dayStart, lt: dayEnd }
-      }
-    },
-    include: {
-      slot: {
-        select: {
-          startTime: true,
-          endTime: true,
-          durationMinutes: true
-        }
-      }
-    }
-  })
-
-  const dailyMinutes = dailyBookings.reduce((sum: number, booking: BookingWithSlot) => {
-    if (booking.slot.durationMinutes) {
-      return sum + booking.slot.durationMinutes
-    }
-    const start = new Date(booking.slot.startTime)
-    const end = new Date(booking.slot.endTime)
-    const diffMinutes = Math.round((end.getTime() - start.getTime()) / (1000 * 60))
-    return sum + diffMinutes
-  }, 0)
-
-  if (dailyMinutes + slotDurationMin > 120) {
-    throw new DomainError('BOOKING_LIMIT_EXCEEDED', 'وصلت للحد الأقصى اليومي (ساعتين)')
-  }
-
-  const weeklyBookings: BookingWithSlot[] = await prisma.booking.findMany({
-    where: {
-      userId,
-      status: {
-        in: [BOOKING_STATUS.CONFIRMED, BOOKING_STATUS.PENDING_PAYMENT]
-      },
-      slot: {
-        startTime: { gte: weekStart, lt: weekEnd }
-      }
-    },
-    include: {
-      slot: {
-        select: {
-          startTime: true,
-          endTime: true,
-          durationMinutes: true
-        }
-      }
-    }
-  })
-
-  const weeklyMinutes = weeklyBookings.reduce((sum: number, booking: BookingWithSlot) => {
-    if (booking.slot.durationMinutes) {
-      return sum + booking.slot.durationMinutes
-    }
-    const start = new Date(booking.slot.startTime)
-    const end = new Date(booking.slot.endTime)
-    const diffMinutes = Math.round((end.getTime() - start.getTime()) / (1000 * 60))
-    return sum + diffMinutes
-  }, 0)
-
-  if (weeklyMinutes + slotDurationMin > 240) {
-    throw new DomainError('BOOKING_LIMIT_EXCEEDED', 'وصلت للحد الأقصى الأسبوعي (4 ساعات)')
-  }
-
-  return true
 }
 // lib/domain/slots/time-slots/core-logic.ts
 import { addMinutes, startOfDay, addDays, getHours, getMinutes } from 'date-fns'
@@ -2956,7 +2878,8 @@ export async function lockSlot({
       data: {
         status: SLOT_STATUS.TEMP_LOCKED,
         lockedUntil: addMinutes(now, LOCK_DURATION_MINUTES),
-        lockedByUserId: userId
+        lockedById: null
+userId
       }
     })
 
@@ -2993,7 +2916,107 @@ export function generateNextDays(count: number = 10): Day[] {
 }
 
 export function generateNextTenDays(): Day[] {
-  return generateNextDays(10)
+ //lib/domain/slots/time-slots/booking-limits.ts
+import { prisma } from '@/lib/infrastructure/database/prisma'
+import { startOfDay, addDays } from 'date-fns'
+import { DomainError } from '@/lib/core/errors/domain-errors'
+import { BOOKING_STATUS } from '@/lib/shared/constants'
+
+type BookingWithSlot = {
+  slot: {
+    startTime: Date
+    endTime: Date
+    durationMinutes: number | null
+  }
+}
+
+export async function checkBookingLimits({
+  userId,
+  slotDate,
+  slotDurationMin
+}: {
+  userId: string
+  slotDate: Date
+  slotDurationMin: number
+}) {
+  const dayStart = startOfDay(slotDate)
+  const dayEnd = addDays(dayStart, 1)
+
+  const dayOfWeek = dayStart.getDay()
+  const weekStart = addDays(dayStart, -dayOfWeek)
+  const weekEnd = addDays(weekStart, 7)
+
+  const dailyBookings: BookingWithSlot[] = await prisma.booking.findMany({
+    where: {
+      userId,
+      status: {
+        in: [BOOKING_STATUS.CONFIRMED, BOOKING_STATUS.PENDING_PAYMENT]
+      },
+      slot: {
+        startTime: { gte: dayStart, lt: dayEnd }
+      }
+    },
+    include: {
+      slot: {
+        select: {
+          startTime: true,
+          endTime: true,
+          durationMinutes: true
+        }
+      }
+    }
+  })
+
+  const dailyMinutes = dailyBookings.reduce((sum: number, booking: BookingWithSlot) => {
+    if (booking.slot.durationMinutes) {
+      return sum + booking.slot.durationMinutes
+    }
+    const start = new Date(booking.slot.startTime)
+    const end = new Date(booking.slot.endTime)
+    const diffMinutes = Math.round((end.getTime() - start.getTime()) / (1000 * 60))
+    return sum + diffMinutes
+  }, 0)
+
+  if (dailyMinutes + slotDurationMin > 120) {
+    throw new DomainError('BOOKING_LIMIT_EXCEEDED', 'وصلت للحد الأقصى اليومي (ساعتين)')
+  }
+
+  const weeklyBookings: BookingWithSlot[] = await prisma.booking.findMany({
+    where: {
+      userId,
+      status: {
+        in: [BOOKING_STATUS.CONFIRMED, BOOKING_STATUS.PENDING_PAYMENT]
+      },
+      slot: {
+        startTime: { gte: weekStart, lt: weekEnd }
+      }
+    },
+    include: {
+      slot: {
+        select: {
+          startTime: true,
+          endTime: true,
+          durationMinutes: true
+        }
+      }
+    }
+  })
+
+  const weeklyMinutes = weeklyBookings.reduce((sum: number, booking: BookingWithSlot) => {
+    if (booking.slot.durationMinutes) {
+      return sum + booking.slot.durationMinutes
+    }
+    const start = new Date(booking.slot.startTime)
+    const end = new Date(booking.slot.endTime)
+    const diffMinutes = Math.round((end.getTime() - start.getTime()) / (1000 * 60))
+    return sum + diffMinutes
+  }, 0)
+
+  if (weeklyMinutes + slotDurationMin > 240) {
+    throw new DomainError('BOOKING_LIMIT_EXCEEDED', 'وصلت للحد الأقصى الأسبوعي (4 ساعات)')
+  }
+
+  return true
 }
 // lib/domain/guards/slot-guards.ts
 import { prisma } from '@/lib/infrastructure/database/prisma'
@@ -3110,7 +3133,7 @@ export class SlotStateGuard {
       },
       data: {
         status: SLOT_STATUS.AVAILABLE,
-        lockedByUserId: null,
+        lockedById: null,
         lockedUntil: null
       }
     })
@@ -3307,16 +3330,13 @@ export {
 // lib/domain/guards/booking-guards.ts
 import { prisma } from '@/lib/infrastructure/database/prisma'
 import { DomainError } from '@/lib/core/errors/domain-errors'
-import { 
-  SLOT_STATUS, 
-  BOOKING_STATUS 
-} from '@/lib/shared/constants'
+import { SLOT_STATUS, BOOKING_STATUS } from '@/lib/shared/constants'
 import { StateTransitionValidator } from '@/lib/application/services/booking-transitions'
 
 export class BookingGuard {
   static async assertBookingState(params: {
     bookingId: string
-    expectedStatuses: string[] // ✅ إصلاح: استخدم string[] بدلاً من BOOKING_STATUS[]
+    expectedStatuses: BookingStatus[]
     userId?: string
     customCheck?: (booking: any) => Promise<void>
   }) {
@@ -3340,7 +3360,7 @@ export class BookingGuard {
       throw new DomainError('BOOKING_NOT_OWNED')
     }
 
-    if (!params.expectedStatuses.includes(booking.status)) {
+    if (!params.expectedStatuses.includes(booking.status as BookingStatus)) {
       throw new DomainError(
         'BOOKING_INVALID_STATE',
         `الحالة الحالية (${booking.status}) لا تسمح بهذه العملية. ` +
@@ -3348,17 +3368,13 @@ export class BookingGuard {
       )
     }
 
-    // ✅ إصلاح: استخدام المتغيرات بدلاً من تجاهلها
+    // التحقق من صحة تدفق الحالات
     try {
-      // التحقق من حالة الـ slot
       const slotValidation = StateTransitionValidator.validateCompleteBookingFlow(
-        booking.slot.status,
-        booking.status,
-        booking.paymentStatus
+        booking.slot.status as SlotStatus,
+        booking.status as BookingStatus,
+        booking.paymentStatus as PaymentStatus
       )
-      
-      // تسجيل التحقق إذا نجح
-      console.log('Slot validation passed:', slotValidation);
     } catch (error: any) {
       throw new DomainError('BOOKING_INVALID_STATE', error.message)
     }
@@ -3368,13 +3384,10 @@ export class BookingGuard {
     if (lastPayment) {
       try {
         const paymentValidation = StateTransitionValidator.validatePaymentTransition(
-          lastPayment.status,
-          booking.paymentStatus,
+          lastPayment.status as PaymentStatus,
+          booking.paymentStatus as PaymentStatus,
           lastPayment
         )
-        
-        // تسجيل التحقق إذا نجح
-        console.log('Payment validation passed:', paymentValidation);
       } catch (error: any) {
         throw new DomainError('PAYMENT_FAILED', error.message)
       }
@@ -3406,7 +3419,6 @@ export class BookingGuard {
 
     const now = new Date()
 
-    // ✅ إصلاح: استخدم المقارنة الصحيحة
     if (slot.status !== SLOT_STATUS.TEMP_LOCKED) {
       throw new DomainError('SLOT_CANNOT_BE_LOCKED')
     }
@@ -3443,7 +3455,6 @@ export class BookingGuard {
 
     const now = new Date()
 
-    // التحقق من حالة الملعب
     if (slot.field?.status !== 'OPEN') {
       throw new DomainError(
         'FIELD_NOT_FOUND',
@@ -3451,13 +3462,11 @@ export class BookingGuard {
       )
     }
 
-    // التحقق من حالة الـ slot
     if (slot.status === SLOT_STATUS.BOOKED) {
       throw new DomainError('SLOT_ALREADY_BOOKED')
     }
 
-    // ✅ إصلاح: أزل المقارنة مع UNAVAILABLE أو استخدم string مباشرة
-    if (slot.status === 'UNAVAILABLE') {
+    if (slot.status === SLOT_STATUS.UNAVAILABLE) {
       throw new DomainError('SLOT_UNAVAILABLE')
     }
 
@@ -3480,7 +3489,6 @@ export class BookingGuard {
     return { slot, canExtend: false }
   }
 
-  // دالة مساعدة للتحقق من حدود الحجز
   static async assertBookingLimits(params: {
     userId: string
     date: Date
@@ -3510,7 +3518,7 @@ export class BookingGuard {
           lte: endOfDay
         },
         status: {
-          in: [BOOKING_STATUS.CONFIRMED, 'PENDING_PAYMENT'] // ✅ استخدم string مباشرة
+          in: [BOOKING_STATUS.CONFIRMED, BOOKING_STATUS.PENDING_PAYMENT]
         }
       }
     })
@@ -3524,7 +3532,7 @@ export class BookingGuard {
           lte: endOfWeek
         },
         status: {
-          in: [BOOKING_STATUS.CONFIRMED, 'PENDING_PAYMENT'] // ✅ استخدم string مباشرة
+          in: [BOOKING_STATUS.CONFIRMED, BOOKING_STATUS.PENDING_PAYMENT]
         }
       }
     })
@@ -3645,26 +3653,43 @@ export type BookingWithRelations = any // سيحدد من Prisma
 export type SlotWithRelations = any
 // lib/core/types/index.ts
 import { 
-  SLOT_STATUS, 
-  BOOKING_STATUS, 
-  FIELD_STATUS, 
-  FIELD_TYPES,
-  PAYMENT_STATUS 
+  SlotStatus,
+  BookingStatus,
+  FieldStatus,
+  FieldType,
+  PaymentStatus,
+  NotificationType,
+  UserRole,
+  SkillLevel
 } from '@/lib/shared/constants'
 
-export type SlotStatus = typeof SLOT_STATUS[keyof typeof SLOT_STATUS]
-export type BookingStatus = typeof BOOKING_STATUS[keyof typeof BOOKING_STATUS]
-export type FieldStatus = typeof FIELD_STATUS[keyof typeof FIELD_STATUS]
-export type FieldType = typeof FIELD_TYPES[keyof typeof FIELD_TYPES]
-export type PaymentStatus = typeof PAYMENT_STATUS[keyof typeof PAYMENT_STATUS]
+// Re-export الأنواع الأساسية
+export type { 
+  SlotStatus,
+  BookingStatus,
+  FieldStatus,
+  FieldType,
+  PaymentStatus,
+  NotificationType,
+  UserRole,
+  SkillLevel
+}
 
 export interface User {
   id: string
   email: string
   name: string
-  phone?: string
-  avatar?: string
+  phoneNumber?: string | null
+  avatarUrl?: string | null
+  age?: number | null
+  description?: string | null
+  skillLevel?: SkillLevel
+  role: UserRole
+  isActive: boolean
+  isVerified: boolean
+  lastLogin?: Date | null
   createdAt: Date
+  updatedAt: Date
 }
 
 export interface Field {
@@ -3675,7 +3700,7 @@ export interface Field {
   address?: string | null
   pricePerHour: number
   depositPrice: number
-  imageUrl?: string | null
+  mainImage?: string | null
   gallery: string[]
   type: FieldType
   status: FieldStatus
@@ -3683,9 +3708,9 @@ export interface Field {
   closingTime: string
   slotDurationMin: number
   facilities: string[]
-  rules: string[]
-  rating: number
-  reviewCount: number
+  capacity?: number | null
+  rating?: number
+  reviewCount?: number
   createdAt: Date
   updatedAt: Date
 }
@@ -3699,7 +3724,11 @@ export interface Slot {
   price: number
   deposit: number
   lockedUntil?: Date
-  lockedByUserId?: string
+  lockedById?: string
+  isPeakHour: boolean
+  discount: number
+  createdAt: Date
+  updatedAt: Date
 }
 
 export interface Booking {
@@ -3711,8 +3740,10 @@ export interface Booking {
   paymentStatus: PaymentStatus
   totalAmount: number
   depositPaid: number
-  refundableUntil?: Date
-  cancellationReason?: string
+  expiresAt?: Date
+  confirmedAt?: Date
+  cancelledAt?: Date
+  completedAt?: Date
   createdAt: Date
   updatedAt: Date
   field?: Field
@@ -3725,14 +3756,19 @@ export interface Payment {
   bookingId: string
   amount: number
   currency: string
-  paymentId: string
-  orderId: string
+  gatewayId?: string
+  orderId?: string
+  transactionId?: string
   status: PaymentStatus
   metadata?: Record<string, any>
+  receiptUrl?: string
   createdAt: Date
+  updatedAt: Date
+  paidAt?: Date
+  refundedAt?: Date
 }
 
-// ✅ Day type الموسع عشان يتوافق مع DaySelector
+// ✅ Day type متوافق مع DaySelector
 export interface Day {
   date: string
   isWeekend: boolean
@@ -3754,7 +3790,7 @@ export interface SlotGridProps {
   onSlotSelect?: (slot: Slot) => void
 }
 
-// ✅ تعريفات للـ UI
+// ✅ UI Types
 export interface UISlot {
   id: string
   startTime: Date
@@ -3763,6 +3799,10 @@ export interface UISlot {
   deposit: number
   uiStatus: 'AVAILABLE' | 'LOCKED_ME' | 'LOCKED_OTHER' | 'BOOKED'
   needsConfirmation: boolean
+  metadata?: {
+    lockedUntil?: Date
+    lockedByUserId?: string
+  }
 }
 
 export interface SlotBookingModalProps {
@@ -3823,71 +3863,77 @@ export const ERROR_CODES = {
 
 export type ErrorCode = typeof ERROR_CODES[keyof typeof ERROR_CODES]
 export type ErrorCodeKey = keyof typeof ERROR_CODES
-// lib/core/errors/domain-errors.ts
-import { ERROR_CODES } from './error-codes'
+import { ERROR_CODES, type ErrorCode } from '@/lib/shared/constants'
 
-const ERROR_MESSAGES: Record<keyof typeof ERROR_CODES, string> = {
-  // Auth
-  UNAUTHORIZED: 'غير مصرح',
-  INVALID_CREDENTIALS: 'بيانات الدخول غير صحيحة',
-  SESSION_EXPIRED: 'انتهت الجلسة، يرجى تسجيل الدخول مرة أخرى',
-  
-  // Validation
-  INVALID_INPUT: 'بيانات غير صالحة',
-  MISSING_FIELD: 'حقل مطلوب',
-  INVALID_DATE: 'تاريخ غير صالح',
+const ERROR_MESSAGES: Record<ErrorCode, string> = {
+  // الأخطاء الأساسية
   VALIDATION_ERROR: 'خطأ في التحقق من البيانات',
+  AUTHENTICATION_ERROR: 'خطأ في المصادقة',
+  AUTHORIZATION_ERROR: 'غير مصرح',
+  NOT_FOUND: 'غير موجود',
+  CONFLICT: 'تعارض',
+  RATE_LIMIT_EXCEEDED: 'تم تجاوز الحد المسموح',
+  TOKEN_EXPIRED: 'انتهت صلاحية الرمز',
+  INVALID_TOKEN: 'رمز غير صالح',
+  SERVER_ERROR: 'خطأ في الخادم',
   
-  // Slot
+  // أخطاء الملاعب
+  FIELD_NOT_FOUND: 'الملعب غير موجود',
+  FIELD_CLOSED: 'الملعب مغلق حالياً',
+  FIELD_MAINTENANCE: 'الملعب تحت الصيانة',
+  
+  // أخطاء المواعيد
   SLOT_NOT_FOUND: 'الموعد غير موجود',
+  SLOT_ALREADY_BOOKED: 'الموعد محجوز بالفعل',
   SLOT_UNAVAILABLE: 'الموعد غير متاح للحجز',
   SLOT_LOCKED_BY_OTHER: 'الموعد مقفول مؤقتاً',
-  SLOT_LOCK_EXPIRED: 'انتهت صلاحية القفل',
-  SLOT_ALREADY_BOOKED: 'الموعد محجوز بالفعل',
   SLOT_CANNOT_BE_LOCKED: 'لا يمكن قفل هذا الموعد',
+  SLOT_LOCK_EXPIRED: 'انتهت صلاحية القفل',
   
-  // Booking
+  // أخطاء الحجوزات
   BOOKING_NOT_FOUND: 'الحجز غير موجود',
   BOOKING_NOT_OWNED: 'غير مصرح بالوصول لهذا الحجز',
   BOOKING_INVALID_STATE: 'الحالة الحالية لا تسمح بهذه العملية',
-  BOOKING_LIMIT_EXCEEDED: 'وصلت للحد الأقصى للحجز',
-  BOOKING_EXPIRED: 'انتهت صلاحية الحجز',
   BOOKING_IN_PROGRESS: 'جاري معالجة الطلب',
+  BOOKING_EXPIRED: 'انتهت صلاحية الحجز',
+  BOOKING_LIMIT_EXCEEDED: 'وصلت للحد الأقصى للحجز',
   
-  // Payment
+  // أخطاء الدفع
   PAYMENT_ALREADY_PROCESSED: 'تم دفع هذا الحجز مسبقاً',
   PAYMENT_FAILED: 'فشل عملية الدفع',
   DUPLICATE_PAYMENT: 'تم استخدام orderId مسبقاً',
   PAYMENT_NOT_FOUND: 'عملية الدفع غير موجودة',
   
-  // Time
+  // أخطاء الوقت
   TIME_IN_PAST: 'لا يمكن حجز وقت مضى',
   TIME_TOO_CLOSE: 'الوقت قريب جداً',
+  INVALID_DATE: 'تاريخ غير صالح',
   
-  // Field
-  FIELD_NOT_FOUND: 'الملعب غير موجود',
-  FIELD_CLOSED: 'الملعب مغلق حالياً',
-  FIELD_MAINTENANCE: 'الملعب تحت الصيانة',
+  // أخطاء التحقق
+  INVALID_INPUT: 'بيانات غير صالحة',
+  MISSING_FIELD: 'حقل مطلوب',
   
-  // System
+  // أخطاء المصادقة
+  UNAUTHORIZED: 'غير مصرح',
+  INVALID_CREDENTIALS: 'بيانات الدخول غير صحيحة',
+  SESSION_EXPIRED: 'انتهت الجلسة، يرجى تسجيل الدخول مرة أخرى',
+  
+  // أخطاء النظام
   INTERNAL_ERROR: 'حدث خطأ غير متوقع',
-  RATE_LIMITED: 'تم تجاوز الحد المسموح',
   SERVICE_UNAVAILABLE: 'الخدمة غير متاحة حالياً'
 } as const
 
 export class DomainError extends Error {
   constructor(
-    public code: keyof typeof ERROR_CODES,
+    public code: ErrorCode,
     message?: string,
     public details?: any
   ) {
-    // حل المشكلة: تأكد من أن message دائمًا string
-    super(message || ERROR_MESSAGES[code] || code);
-    this.name = 'DomainError';
+    super(message || ERROR_MESSAGES[code] || 'حدث خطأ غير معروف')
+    this.name = 'DomainError'
     
-    // لحفظ stack trace بشكل صحيح
     if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, DomainError);
+      Error.captureStackTrace(this, DomainError)
     }
   }
   
@@ -3896,7 +3942,8 @@ export class DomainError extends Error {
       error: true,
       code: ERROR_CODES[this.code],
       message: this.message,
-      details: this.details
+      details: this.details,
+      timestamp: new Date().toISOString()
     }
   }
   
@@ -3905,11 +3952,11 @@ export class DomainError extends Error {
   }
 }
 
-// Helper function for API responses
 export function errorResponse(error: unknown) {
   if (error instanceof DomainError) {
+    const status = getStatusCode(error.code)
     return {
-      status: getStatusCode(error.code),
+      status,
       body: error.toResponse()
     }
   }
@@ -3921,31 +3968,52 @@ export function errorResponse(error: unknown) {
     body: {
       error: true,
       code: ERROR_CODES.INTERNAL_ERROR,
-      message: 'حدث خطأ غير متوقع'
+      message: 'حدث خطأ غير متوقع',
+      timestamp: new Date().toISOString()
     }
   }
 }
 
-function getStatusCode(code: keyof typeof ERROR_CODES): number {
+function getStatusCode(code: ErrorCode): number {
   const codeStr = ERROR_CODES[code]
-  const codePrefix = codeStr ? codeStr.split('_')[0] : ''
   
-  switch (codePrefix) {
-    case 'AUTH':
-      return 401
-    case 'VAL':
-      return 400
-    case 'SLOT':
-    case 'BOOK':
-    case 'PAY':
-    case 'TIME':
-    case 'FIELD':
-      return 400
-    case 'SYS':
-      return 500
-    default:
-      return 400
+  if (!codeStr) return 500
+  
+  // أخطاء المصادقة
+  if (code === 'AUTHENTICATION_ERROR' || 
+      code === 'AUTHORIZATION_ERROR' || 
+      code === 'UNAUTHORIZED' ||
+      code === 'INVALID_CREDENTIALS' ||
+      code === 'SESSION_EXPIRED') {
+    return 401
   }
+  
+  // أخطاء التحقق
+  if (code === 'VALIDATION_ERROR' || 
+      code === 'INVALID_INPUT' ||
+      code === 'MISSING_FIELD' ||
+      code === 'INVALID_DATE') {
+    return 400
+  }
+  
+  // أخطاء غير موجودة
+  if (code === 'NOT_FOUND' ||
+      code === 'FIELD_NOT_FOUND' ||
+      code === 'SLOT_NOT_FOUND' ||
+      code === 'BOOKING_NOT_FOUND' ||
+      code === 'PAYMENT_NOT_FOUND') {
+    return 404
+  }
+  
+  // تعارضات
+  if (code === 'CONFLICT' ||
+      code === 'SLOT_ALREADY_BOOKED' ||
+      code === 'PAYMENT_ALREADY_PROCESSED' ||
+      code === 'DUPLICATE_PAYMENT') {
+    return 409
+  }
+  
+  return 400
 }
 // lib/application/services/booking-transitions.ts
 import { 
@@ -4279,7 +4347,7 @@ export class BookingOrchestrator {
             id: input.slotId,
             fieldId: input.fieldId,
             status: SLOT_STATUS.TEMP_LOCKED,
-            lockedByUserId: input.userId,
+            lockedById: input.userId, // ✅ تصحيح: يجب أن تكون userId نفسها
             lockedUntil: { gt: new Date() }
           },
           include: { field: true }
@@ -4469,7 +4537,7 @@ export class BookingOrchestrator {
             first_name: booking.user.name?.split(' ')[0] || "عميل",
             street: "NA",
             building: "NA",
-            phone_number: booking.user.phone || "01000000000",
+            phone_number: booking.user.phoneNumber || "01000000000", // ✅ تصحيح: phoneNumber بدلاً من phone
             shipping_method: "NA",
             postal_code: "NA",
             city: "NA",
@@ -4627,7 +4695,7 @@ export class BookingOrchestrator {
             where: { id: booking.slotId },
             data: {
               status: SLOT_STATUS.BOOKED,
-              lockedByUserId: null,
+              lockedById: null,
               lockedUntil: null
             }
           })
@@ -4662,7 +4730,7 @@ export class BookingOrchestrator {
             where: { id: booking.slotId },
             data: { 
               status: SLOT_STATUS.AVAILABLE,
-              lockedByUserId: null,
+              lockedById: null,
               lockedUntil: null
             }
           })
@@ -4756,7 +4824,7 @@ export class BookingOrchestrator {
               where: { id: booking.slotId },
               data: { 
                 status: SLOT_STATUS.AVAILABLE,
-                lockedByUserId: null,
+                lockedById: null,
                 lockedUntil: null
               }
             })
@@ -4825,7 +4893,7 @@ export class BookingOrchestrator {
         },
         data: {
           status: SLOT_STATUS.AVAILABLE,
-          lockedByUserId: null,
+          lockedById: null,
           lockedUntil: null
         }
       })
@@ -4955,7 +5023,7 @@ export async function unlockSlotsJob() {
 
     const result = await prisma.slot.updateMany({
       where: { status: SLOT_STATUS.TEMP_LOCKED, lockedUntil: { lt: now } },
-      data: { status: SLOT_STATUS.AVAILABLE, lockedByUserId: null, lockedUntil: null }
+      data: { status: SLOT_STATUS.AVAILABLE, lockedById: null, lockedUntil: null }
     })
 
     unlockedCount = result.count
@@ -4992,7 +5060,7 @@ export async function unlockSlotsJob() {
       
       const orphanedResult = await prisma.slot.updateMany({
         where: { id: { in: orphanedSlots.map((s: any) => s.id) } },
-        data: { status: SLOT_STATUS.AVAILABLE, lockedByUserId: null, lockedUntil: null }
+        data: { status: SLOT_STATUS.AVAILABLE, lockedById: null, lockedUntil: null }
       })
 
       orphanedCount = orphanedResult.count
@@ -5129,7 +5197,7 @@ export async function expireBookingsJob() {
             where: { id: booking.slotId },
             data: {
               status: SLOT_STATUS.AVAILABLE,
-              lockedByUserId: null,
+              lockedById: null,
               lockedUntil: null
             }
           })
@@ -5387,459 +5455,222 @@ export class IdempotencyGuard {
     return crypto.createHash('sha256').update(str).digest('hex')
   }
 }
-// app/api/auth/[...nextauth]/route.ts
-import NextAuth from 'next-auth'
-import { authOptions } from '@/lib/infrastructure/auth/auth-options'  // ✅ المسار الجديد
-
-const handler = NextAuth(authOptions)
-
-export { handler as GET, handler as POST }
-
-// app/api/auth/me/route.ts
-import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/infrastructure/auth/auth-options'
-import { prisma } from '@/lib/infrastructure/database/prisma'
-import { successResponse, errorResponse } from '@/lib/infrastructure/auth/responses'
+// app/api/webhooks/paymob/route.ts
+import { NextRequest } from 'next/server'
+import { BookingOrchestrator } from '@/lib/application/services/booking-orchestrator'
+import { paymobService } from '@/lib/infrastructure/payments/providers'
+import { assertWebhookValid } from '@/lib/domain/guards/payment-guards'
+import { apiErrorHandler } from '@/lib/shared/api/api-error-handler'
 import { logger } from '@/lib/shared/logger'
+import { parseISO, differenceInMinutes } from 'date-fns'
 
-// ✅ أضف هذا لتحديد أن المسار ديناميكي
-export const dynamic = 'force-dynamic'
-
-export const GET = async () => {
-  const requestId = `auth_me_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+export async function POST(request: NextRequest) {
+  const webhookId = `webhook_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
   try {
-    logger.info({ requestId }, 'Fetching user data')
+    logger.info({
+      webhookId,
+      ip: request.headers.get('x-forwarded-for') || 'unknown',
+      userAgent: request.headers.get('user-agent') || 'unknown'
+    }, 'Processing Paymob webhook')
+
+    const body = await request.json()
+    const hmac = request.headers.get('hmac')
+
+    if (!hmac) {
+      logger.error({
+        webhookId,
+        headers: Object.fromEntries(request.headers.entries())
+      }, 'HMAC header missing')
+      return apiErrorHandler(new Error('HMAC header missing'))
+    }
+
+    // 1️⃣ التحقق من HMAC
+    if (!paymobService.verifyHMAC(body.obj, hmac)) {
+      logger.error({
+        webhookId,
+        hmac,
+        bodyHash: JSON.stringify(body.obj).length
+      }, 'Invalid HMAC signature')
+      return apiErrorHandler(new Error('Invalid HMAC signature'))
+    }
+
+    // 2️⃣ استخراج البيانات
+    const {
+      success,
+      amount_cents,
+      id: transactionId,
+      order: { id: orderId, merchant_order_id: bookingId },
+      created_at,
+      currency = 'EGP'
+    } = body.obj
+
+    const createdAt = parseISO(created_at)
+    const now = new Date()
+    const minutesDiff = differenceInMinutes(now, createdAt)
+
+    logger.info({
+      webhookId,
+      bookingId,
+      orderId,
+      transactionId,
+      success,
+      amount: amount_cents / 100,
+      created_at: createdAt.toISOString(),
+      minutesAgo: minutesDiff,
+      currency
+    }, 'Webhook data extracted')
+
+    if (minutesDiff > 60) {
+      logger.warn({
+        webhookId,
+        minutesDiff,
+        created_at: createdAt.toISOString(),
+        received_at: now.toISOString()
+      }, 'Webhook is too old, ignoring')
+      return new Response('OK', {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/plain',
+          'X-Webhook-Status': 'IGNORED_OLD'
+        }
+      })
+    }
+
+    // 3️⃣ التحقق من صحة الـ webhook
+    const payment = await assertWebhookValid({
+      orderId: orderId.toString(),
+      transactionId: transactionId.toString(),
+      amount: amount_cents / 100
+    })
+
+    logger.info({
+      webhookId,
+      paymentId: payment.id,
+      bookingId: payment.bookingId,
+      previousStatus: payment.status,
+      created_at: createdAt.toISOString(),
+      processingDelay: minutesDiff
+    }, 'Webhook validated')
+
+    // 4️⃣ معالجة الحجز
+    const processingStart = Date.now()
+
+    await BookingOrchestrator.completeBooking({
+      bookingId: payment.bookingId,
+      success: Boolean(success),
+      paymentDetails: {
+        transactionId: transactionId.toString(),
+        orderId: orderId.toString(),
+        amount: amount_cents / 100,
+        currency
+      }
+    })
+
+    const processingTime = Date.now() - processingStart
+
+    logger.info({
+      webhookId,
+      bookingId: payment.bookingId,
+      success,
+      processingTime,
+      totalTimeFromCreation: minutesDiff + processingTime / 60000
+    }, 'Booking processing completed')
+
+    return new Response('OK', {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/plain',
+        'X-Webhook-ID': webhookId,
+        'X-Processing-Time': processingTime.toString(),
+        'X-Booking-ID': payment.bookingId
+      }
+    })
+  } catch (error: any) {
+    logger.error('Webhook processing error', error, {
+      webhookId,
+      url: request.url,
+      body: JSON.stringify(await request.json()).substring(0, 500)
+    })
+
+    return new Response('ERROR', {
+      status: 500,
+      headers: {
+        'Content-Type': 'text/plain',
+        'X-Webhook-Status': 'ERROR',
+        'X-Error-Message': error.message.substring(0, 100)
+      }
+    })
+  }
+}
+// app/api/payment/create/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/infrastructure/auth/auth-options'
+import { BookingOrchestrator } from '@/lib/application/services/booking-orchestrator' // 🔧 استيراد الكلاس
+import { apiErrorHandler } from '@/lib/shared/api/api-error-handler'
+import { logger } from '@/lib/shared/logger'
+
+export async function POST(request: NextRequest) {
+  const requestId = `create_payment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  
+  try {
+    logger.info({ requestId }, 'Creating payment')
 
     const session = await getServerSession(authOptions)
+    const userId = session?.user?.id
 
-    if (!session?.user?.id) {
-      logger.warn({ requestId }, 'Unauthorized access to /api/auth/me')
+    if (!userId) {
+      logger.warn({ requestId }, 'Unauthorized payment attempt')
       return NextResponse.json(
-        errorResponse('يجب تسجيل الدخول أولاً', 'UNAUTHORIZED'),
+        { error: 'يجب تسجيل الدخول أولاً' },
         { status: 401 }
       )
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phoneNumber: true,
-        age: true,
-        description: true,
-        skillLevel: true,
-        role: true,
-        isVerified: true,
-        isActive: true,
-        lastLogin: true,
-        createdAt: true,
-        updatedAt: true,
-      }
-    })
+    const { bookingId, amount, currency = 'EGP', idempotencyKey } = await request.json()
 
-    if (!user) {
-      logger.warn({ requestId, userId: session.user.id }, 'User not found')
+    if (!bookingId || !amount) {
+      logger.warn({ requestId, bookingId, amount }, 'Incomplete payment data')
       return NextResponse.json(
-        errorResponse('المستخدم غير موجود', 'USER_NOT_FOUND'),
-        { status: 404 }
-      )
-    }
-
-    if (!user.isActive) {
-      logger.warn({ requestId, userId: user.id }, 'Inactive account accessed')
-      return NextResponse.json(
-        errorResponse('الحساب غير نشط', 'ACCOUNT_INACTIVE'),
-        { status: 403 }
-      )
-    }
-
-    logger.info({ requestId, userId: user.id }, 'User data fetched successfully')
-
-    return NextResponse.json(
-      successResponse('تم جلب بيانات المستخدم بنجاح', {
-        user: {
-          ...user,
-          lastLogin: user.lastLogin?.toISOString(),
-          createdAt: user.createdAt.toISOString(),
-          updatedAt: user.updatedAt.toISOString()
-        }
-      }, '/api/auth/me')
-    )
-
-  } catch (error: any) {
-    logger.error('Error in /api/auth/me', error, { requestId })
-    return NextResponse.json(
-      errorResponse('خطأ في جلب بيانات المستخدم', 'INTERNAL_ERROR'),
-      { status: 500 }
-    )
-  }
-}
-// app/api/auth/register/route.ts
-import { NextRequest, NextResponse } from 'next/server'
-import { RateLimiterMemory } from 'rate-limiter-flexible'
-import { prisma } from '@/lib/infrastructure/database/prisma'  
-import { hashPassword } from '@/lib/infrastructure/security/password'  // ✅ المسار الجديد
-import { z } from 'zod'
-import { logger } from '@/lib/shared/logger'  // ✅ استخدام الـ logger الجديد
-
-// Rate Limiter للتسجيل
-const registerRateLimiter = new RateLimiterMemory({
-  points: 3,
-  duration: 60 * 60,
-  blockDuration: 60 * 60,
-})
-
-const registerSchema = z.object({
-  name: z.string().min(2, 'الاسم يجب أن يكون حرفين على الأقل'),
-  email: z.string().email('البريد الإلكتروني غير صالح'),
-  password: z.string()
-    .min(6, 'كلمة المرور يجب أن تكون 6 أحرف على الأقل')
-    .max(72, 'كلمة المرور طويلة جداً'),
-  phoneNumber: z.string().min(10, 'رقم الهاتف غير صالح'),
-  age: z.number().min(13, 'العمر يجب أن يكون 13 سنة على الأقل'),
-  skillLevel: z.enum(['WEAK', 'AVERAGE', 'GOOD', 'EXCELLENT', 'LEGENDARY'])
-})
-
-const normalizeEmail = (email: string): string => {
-  return email.toLowerCase().trim()
-}
-
-const checkRegisterRateLimit = async (ip: string) => {
-  try {
-    await registerRateLimiter.consume(ip)
-    return { allowed: true }
-  } catch (rateLimiterRes: any) {
-    const retryAfter = Math.ceil(rateLimiterRes.msBeforeNext / 1000) || 60
-    throw new Error(`لقد تجاوزت الحد المسموح به من التسجيلات. حاول مرة أخرى بعد ${retryAfter} ثانية`)
-  }
-}
-
-const getClientIp = (request: NextRequest): string => {
-  const forwardedFor = request.headers.get('x-forwarded-for')
-  const realIp = request.headers.get('x-real-ip')
-  
-  if (forwardedFor) {
-    return forwardedFor.split(',')[0].trim()
-  }
-  
-  return realIp || 'unknown'
-}
-
-export async function POST(request: NextRequest) {
-  const requestId = `register_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-  
-  try {
-    logger.info({ requestId }, 'Registration attempt')
-    
-    const clientIp = getClientIp(request)
-    await checkRegisterRateLimit(clientIp)
-    
-    const body = await request.json()
-    const validatedData = registerSchema.parse(body)
-
-    const normalizedEmail = normalizeEmail(validatedData.email)
-
-    const existingUser = await prisma.user.findUnique({
-      where: { email: normalizedEmail }
-    })
-
-    if (existingUser) {
-      logger.warn({ requestId, email: normalizedEmail }, 'Email already exists')
-      return NextResponse.json(
-        { 
-          success: false,
-          error: 'البريد الإلكتروني مستخدم بالفعل',
-          code: 'EMAIL_ALREADY_EXISTS'
-        },
-        { status: 409 }
-      )
-    }
-
-    const existingPhone = await prisma.user.findUnique({
-      where: { phoneNumber: validatedData.phoneNumber }
-    })
-
-    if (existingPhone) {
-      logger.warn({ requestId, phone: validatedData.phoneNumber }, 'Phone already exists')
-      return NextResponse.json(
-        { 
-          success: false,
-          error: 'رقم الهاتف مستخدم بالفعل',
-          code: 'PHONE_ALREADY_EXISTS'
-        },
-        { status: 409 }
-      )
-    }
-
-    const hashedPassword = await hashPassword(validatedData.password)
-
-    const user = await prisma.user.create({
-      data: {
-        name: validatedData.name,
-        email: normalizedEmail,
-        passwordHash: hashedPassword,
-        phoneNumber: validatedData.phoneNumber,
-        age: validatedData.age,
-        skillLevel: validatedData.skillLevel,
-        role: 'PLAYER',
-        roleUpdatedAt: new Date(),
-        isActive: true,
-        isVerified: false,
-        emailVerifiedAt: null
-      }
-    })
-
-    logger.info({ requestId, userId: user.id }, 'Registration successful')
-    
-    return NextResponse.json({
-      success: true,
-      message: 'تم إنشاء الحساب بنجاح',
-      data: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        requiresVerification: true
-      }
-    }, { status: 201 })
-
-  } catch (error: any) {
-    if (error.name === 'ZodError') {
-      const firstError = error.errors[0]
-      logger.warn({ requestId, error: firstError.message }, 'Validation error in registration')
-      return NextResponse.json(
-        { 
-          success: false,
-          error: firstError.message,
-          code: 'VALIDATION_ERROR'
-        },
+        { error: 'بيانات الدفع غير مكتملة' },
         { status: 400 }
       )
     }
 
-    if (error.message.includes('لقد تجاوزت الحد المسموح')) {
-      logger.warn({ requestId, error: error.message }, 'Rate limit exceeded')
+    if (amount <= 0) {
+      logger.warn({ requestId, amount }, 'Invalid payment amount')
       return NextResponse.json(
-        { 
-          success: false,
-          error: error.message,
-          code: 'RATE_LIMIT_EXCEEDED'
-        },
-        { status: 429 }
+        { error: 'قيمة الدفع غير صالحة' },
+        { status: 400 }
       )
     }
 
-    logger.error('Registration error', error, { requestId })
-    return NextResponse.json(
-      { 
-        success: false,
-        error: 'فشل في إنشاء الحساب',
-        code: 'INTERNAL_SERVER_ERROR'
-      },
-      { status: 500 }
-    )
-  }
-}
-// app/api/bookings/route.ts
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { prisma } from '@/lib/infrastructure/database/prisma'
-import { authOptions } from '@/lib/infrastructure/auth/auth-options'
-import { BookingOrchestrator } from '@/lib/application/services/booking-orchestrator'  // ✅ استيراد الكلاس مباشرة
-import { IdempotencyGuard } from '@/lib/application/idempotency/idempotency-guard'
-import { DomainError } from '@/lib/core/errors/domain-errors'
-import { apiErrorHandler } from '@/lib/shared/api/api-error-handler'
-import { BOOKING_STATUS } from '@/lib/shared/constants'
-import { logger } from '@/lib/shared/logger'
-
-export async function GET(request: NextRequest) {
-  const requestId = `get_bookings_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-  
-  try {
-    logger.info({ requestId }, 'Fetching bookings')
-    
-    const session = await getServerSession(authOptions)
-    const userId = session?.user?.id
-
-    if (!userId) {
-      logger.warn({ requestId }, 'Unauthorized access to bookings')
-      throw new DomainError('UNAUTHORIZED')
-    }
-
-    const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 50)
-    const status = searchParams.get('status')
-    const skip = (page - 1) * limit
-
-    const where: any = { userId }
-    
-    if (status) {
-      where.status = status
-    } else {
-      where.status = {
-        in: [BOOKING_STATUS.CONFIRMED, BOOKING_STATUS.PENDING_PAYMENT]
-      }
-    }
-
-    const [bookings, total] = await Promise.all([
-      prisma.booking.findMany({
-        where,
-        include: {
-          field: {
-            select: {
-              id: true,
-              name: true,
-              pricePerHour: true
-            }
-          },
-          slot: {
-            select: {
-              id: true,
-              startTime: true,
-              endTime: true,
-              durationMinutes: true
-            }
-          },
-          payments: {
-            take: 1,
-            orderBy: { createdAt: 'desc' }
-          }
-        },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit
-      }),
-      prisma.booking.count({ where })
-    ])
-
-    logger.info({ 
-      requestId, 
-      userId, 
-      count: bookings.length,
-      total 
-    }, 'Bookings fetched successfully')
-    
-    return NextResponse.json({
-      success: true,
-      data: bookings,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-        hasMore: page * limit < total
-      }
-    })
-
-  } catch (error: any) {
-    logger.error('Get bookings error', error, { requestId })
-    return apiErrorHandler(error)
-  }
-}
-
-export async function POST(request: NextRequest) {
-  const requestId = `create_booking_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-  
-  try {
-    logger.info({ requestId }, 'Creating booking')
-    
-    const session = await getServerSession(authOptions)
-    const userId = session?.user?.id
-
-    if (!userId) {
-      logger.warn({ requestId }, 'Unauthorized booking creation attempt')
-      throw new DomainError('UNAUTHORIZED')
-    }
-
-    const { slotId, fieldId, idempotencyKey } = await request.json()
-
-    if (!slotId || !fieldId) {
-      logger.warn({ requestId, slotId, fieldId }, 'Incomplete booking data')
-      throw new DomainError('VALIDATION_ERROR', 'بيانات الحجز غير مكتملة')
-    }
-
-    const finalKey = idempotencyKey || IdempotencyGuard.generateKey('booking')
-
-    // ✅ استدعاء الـ static method من الكلاس
-    const result = await BookingOrchestrator.createBooking({
+    // 🔧 التعديل هنا
+    const result = await BookingOrchestrator.initiatePayment({  // ✅ BookingOrchestrator.
+      bookingId,
+      amount,
+      currency,
+      idempotencyKey,
       userId,
-      slotId,
-      fieldId,
-      idempotencyKey: finalKey
     })
 
-    logger.info({ 
-      requestId, 
-      bookingId: result.bookingId,
-      userId 
-    }, 'Booking created successfully')
-    
+    logger.info({
+      requestId,
+      bookingId,
+      orderId: result.orderId,
+      userId
+    }, 'Payment initiated successfully')
+
     return NextResponse.json({
       success: true,
-      ...result,
-      idempotencyKey: finalKey
+      data: result,
+      message: 'تم بدء عملية الدفع بنجاح'
     })
 
   } catch (error: any) {
-    logger.error('Create booking error', error, { requestId })
+    logger.error('Payment creation error', error, { requestId })
     return apiErrorHandler(error)
-  }
-}
-//app/api/cron/cleanup/rout.ts
-import { NextResponse } from 'next/server'
-import { BookingOrchestrator } from '@/lib/application/services/booking-orchestrator' // 🔧 استيراد الكلاس
-import { ENV } from '@/lib/shared/env/env'
-import { logger } from '@/lib/shared/logger'
-
-export const dynamic = 'force-dynamic'
-
-export async function GET(request: Request) {
-  const jobId = `cron_cleanup_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-  
-  try {
-    logger.info({ jobId }, 'Starting cron cleanup job')
-    
-    const authHeader = request.headers.get('authorization')
-    
-    if (authHeader !== `Bearer ${ENV.CRON_SECRET}`) {
-      logger.warn({ jobId }, 'Unauthorized cron attempt')
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // 🔧 التعديل هنا - استخدم static methods
-    const [expireResult, unlockResult] = await Promise.all([
-      BookingOrchestrator.cleanupExpiredBookings(),    // ✅ BookingOrchestrator.
-      BookingOrchestrator.cleanupExpiredLocks()        // ✅ BookingOrchestrator.
-    ])
-
-    logger.info({ 
-      jobId,
-      expiredBookings: expireResult.cleaned || 0,
-      unlockedSlots: unlockResult.unlockedSlots || 0
-    }, 'Cron cleanup completed')
-    
-    return NextResponse.json({
-      success: true,
-      timestamp: new Date().toISOString(),
-      results: {
-        expireBookings: expireResult,
-        unlockSlots: unlockResult
-      }
-    })
-  } catch (error: any) {
-    logger.error('Cron cleanup error', error, { jobId })
-    return NextResponse.json(
-      { 
-        success: false,
-        error: 'Cleanup failed', 
-        details: error.message 
-      },
-      { status: 500 }
-    )
   }
 }
 // app/api/fields/route.ts
@@ -6261,7 +6092,7 @@ export async function GET(
       },
       data: {
         status: SLOT_STATUS.AVAILABLE,
-        lockedByUserId: null,
+        lockedById: null,
         lockedUntil: null
       }
     })
@@ -6307,7 +6138,7 @@ export async function GET(
           depositPrice: field.depositPrice,
           openingTime: field.openingTime,
           closingTime: field.closingTime,
-          slotDurationMin: field.slotDurationMin
+          slotDuration: field.slotDuration // ✅ تصحيح: slotDuration بدلاً من slotDurationMin
         },
         slots: uiSlots,
         date: date.toISOString().split('T')[0],
@@ -6389,7 +6220,7 @@ export async function GET(
       data: {
         status: SLOT_STATUS.AVAILABLE,
         lockedUntil: null,
-        lockedByUserId: null
+        lockedById: null
       }
     })
 
@@ -6582,7 +6413,7 @@ export async function POST(
         data: {
           status: SLOT_STATUS.TEMP_LOCKED,
           lockedUntil: addMinutes(now, LOCK_DURATION_MINUTES),
-          lockedByUserId: userId
+          lockedById: null
         }
       })
 
@@ -6700,1377 +6531,538 @@ export async function POST(
     return apiErrorHandler(error)
   }
 }
-// app/api/payment/create/route.ts
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/infrastructure/auth/auth-options'
+//app/api/cron/cleanup/rout.ts
+import { NextResponse } from 'next/server'
 import { BookingOrchestrator } from '@/lib/application/services/booking-orchestrator' // 🔧 استيراد الكلاس
-import { apiErrorHandler } from '@/lib/shared/api/api-error-handler'
+import { ENV } from '@/lib/shared/env/env'
 import { logger } from '@/lib/shared/logger'
 
-export async function POST(request: NextRequest) {
-  const requestId = `create_payment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+export const dynamic = 'force-dynamic'
+
+export async function GET(request: Request) {
+  const jobId = `cron_cleanup_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   
   try {
-    logger.info({ requestId }, 'Creating payment')
+    logger.info({ jobId }, 'Starting cron cleanup job')
+    
+    const authHeader = request.headers.get('authorization')
+    
+    if (authHeader !== `Bearer ${ENV.CRON_SECRET}`) {
+      logger.warn({ jobId }, 'Unauthorized cron attempt')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
+    // 🔧 التعديل هنا - استخدم static methods
+    const [expireResult, unlockResult] = await Promise.all([
+      BookingOrchestrator.cleanupExpiredBookings(),    // ✅ BookingOrchestrator.
+      BookingOrchestrator.cleanupExpiredLocks()        // ✅ BookingOrchestrator.
+    ])
+
+    logger.info({ 
+      jobId,
+      expiredBookings: expireResult.cleaned || 0,
+      unlockedSlots: unlockResult.unlockedSlots || 0
+    }, 'Cron cleanup completed')
+    
+    return NextResponse.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      results: {
+        expireBookings: expireResult,
+        unlockSlots: unlockResult
+      }
+    })
+  } catch (error: any) {
+    logger.error('Cron cleanup error', error, { jobId })
+    return NextResponse.json(
+      { 
+        success: false,
+        error: 'Cleanup failed', 
+        details: error.message 
+      },
+      { status: 500 }
+    )
+  }
+}
+// app/api/bookings/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { prisma } from '@/lib/infrastructure/database/prisma'
+import { authOptions } from '@/lib/infrastructure/auth/auth-options'
+import { BookingOrchestrator } from '@/lib/application/services/booking-orchestrator'  // ✅ استيراد الكلاس مباشرة
+import { IdempotencyGuard } from '@/lib/application/idempotency/idempotency-guard'
+import { DomainError } from '@/lib/core/errors/domain-errors'
+import { apiErrorHandler } from '@/lib/shared/api/api-error-handler'
+import { BOOKING_STATUS } from '@/lib/shared/constants'
+import { logger } from '@/lib/shared/logger'
+
+export async function GET(request: NextRequest) {
+  const requestId = `get_bookings_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  
+  try {
+    logger.info({ requestId }, 'Fetching bookings')
+    
     const session = await getServerSession(authOptions)
     const userId = session?.user?.id
 
     if (!userId) {
-      logger.warn({ requestId }, 'Unauthorized payment attempt')
+      logger.warn({ requestId }, 'Unauthorized access to bookings')
+      throw new DomainError('UNAUTHORIZED')
+    }
+
+    const { searchParams } = new URL(request.url)
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = Math.min(parseInt(searchParams.get('limit') || '20'), 50)
+    const status = searchParams.get('status')
+    const skip = (page - 1) * limit
+
+    const where: any = { userId }
+    
+    if (status) {
+      where.status = status
+    } else {
+      where.status = {
+        in: [BOOKING_STATUS.CONFIRMED, BOOKING_STATUS.PENDING_PAYMENT]
+      }
+    }
+
+    const [bookings, total] = await Promise.all([
+      prisma.booking.findMany({
+        where,
+        include: {
+          field: {
+            select: {
+              id: true,
+              name: true,
+              pricePerHour: true
+            }
+          },
+          slot: {
+            select: {
+              id: true,
+              startTime: true,
+              endTime: true,
+              durationMinutes: true
+            }
+          },
+          payments: {
+            take: 1,
+            orderBy: { createdAt: 'desc' }
+          }
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit
+      }),
+      prisma.booking.count({ where })
+    ])
+
+    logger.info({ 
+      requestId, 
+      userId, 
+      count: bookings.length,
+      total 
+    }, 'Bookings fetched successfully')
+    
+    return NextResponse.json({
+      success: true,
+      data: bookings,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasMore: page * limit < total
+      }
+    })
+
+  } catch (error: any) {
+    logger.error('Get bookings error', error, { requestId })
+    return apiErrorHandler(error)
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const requestId = `create_booking_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  
+  try {
+    logger.info({ requestId }, 'Creating booking')
+    
+    const session = await getServerSession(authOptions)
+    const userId = session?.user?.id
+
+    if (!userId) {
+      logger.warn({ requestId }, 'Unauthorized booking creation attempt')
+      throw new DomainError('UNAUTHORIZED')
+    }
+
+    const { slotId, fieldId, idempotencyKey } = await request.json()
+
+    if (!slotId || !fieldId) {
+      logger.warn({ requestId, slotId, fieldId }, 'Incomplete booking data')
+      throw new DomainError('VALIDATION_ERROR', 'بيانات الحجز غير مكتملة')
+    }
+
+    const finalKey = idempotencyKey || IdempotencyGuard.generateKey('booking')
+
+    // ✅ استدعاء الـ static method من الكلاس
+    const result = await BookingOrchestrator.createBooking({
+      userId,
+      slotId,
+      fieldId,
+      idempotencyKey: finalKey
+    })
+
+    logger.info({ 
+      requestId, 
+      bookingId: result.bookingId,
+      userId 
+    }, 'Booking created successfully')
+    
+    return NextResponse.json({
+      success: true,
+      ...result,
+      idempotencyKey: finalKey
+    })
+
+  } catch (error: any) {
+    logger.error('Create booking error', error, { requestId })
+    return apiErrorHandler(error)
+  }
+}
+// app/api/auth/register/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+import { RateLimiterMemory } from 'rate-limiter-flexible'
+import { prisma } from '@/lib/infrastructure/database/prisma'  
+import { hashPassword } from '@/lib/infrastructure/security/password'  // ✅ المسار الجديد
+import { z } from 'zod'
+import { logger } from '@/lib/shared/logger'  // ✅ استخدام الـ logger الجديد
+
+// Rate Limiter للتسجيل
+const registerRateLimiter = new RateLimiterMemory({
+  points: 3,
+  duration: 60 * 60,
+  blockDuration: 60 * 60,
+})
+
+const registerSchema = z.object({
+  name: z.string().min(2, 'الاسم يجب أن يكون حرفين على الأقل'),
+  email: z.string().email('البريد الإلكتروني غير صالح'),
+  password: z.string()
+    .min(6, 'كلمة المرور يجب أن تكون 6 أحرف على الأقل')
+    .max(72, 'كلمة المرور طويلة جداً'),
+  phoneNumber: z.string().min(10, 'رقم الهاتف غير صالح'),
+  age: z.number().min(13, 'العمر يجب أن يكون 13 سنة على الأقل'),
+  skillLevel: z.enum(['WEAK', 'AVERAGE', 'GOOD', 'EXCELLENT', 'LEGENDARY'])
+})
+
+const normalizeEmail = (email: string): string => {
+  return email.toLowerCase().trim()
+}
+
+const checkRegisterRateLimit = async (ip: string) => {
+  try {
+    await registerRateLimiter.consume(ip)
+    return { allowed: true }
+  } catch (rateLimiterRes: any) {
+    const retryAfter = Math.ceil(rateLimiterRes.msBeforeNext / 1000) || 60
+    throw new Error(`لقد تجاوزت الحد المسموح به من التسجيلات. حاول مرة أخرى بعد ${retryAfter} ثانية`)
+  }
+}
+
+const getClientIp = (request: NextRequest): string => {
+  const forwardedFor = request.headers.get('x-forwarded-for')
+  const realIp = request.headers.get('x-real-ip')
+  
+  if (forwardedFor) {
+    return forwardedFor.split(',')[0].trim()
+  }
+  
+  return realIp || 'unknown'
+}
+
+export async function POST(request: NextRequest) {
+  const requestId = `register_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  
+  try {
+    logger.info({ requestId }, 'Registration attempt')
+    
+    const clientIp = getClientIp(request)
+    await checkRegisterRateLimit(clientIp)
+    
+    const body = await request.json()
+    const validatedData = registerSchema.parse(body)
+
+    const normalizedEmail = normalizeEmail(validatedData.email)
+
+    const existingUser = await prisma.user.findUnique({
+      where: { email: normalizedEmail }
+    })
+
+    if (existingUser) {
+      logger.warn({ requestId, email: normalizedEmail }, 'Email already exists')
       return NextResponse.json(
-        { error: 'يجب تسجيل الدخول أولاً' },
+        { 
+          success: false,
+          error: 'البريد الإلكتروني مستخدم بالفعل',
+          code: 'EMAIL_ALREADY_EXISTS'
+        },
+        { status: 409 }
+      )
+    }
+
+    const existingPhone = await prisma.user.findUnique({
+      where: { phoneNumber: validatedData.phoneNumber }
+    })
+
+    if (existingPhone) {
+      logger.warn({ requestId, phone: validatedData.phoneNumber }, 'Phone already exists')
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'رقم الهاتف مستخدم بالفعل',
+          code: 'PHONE_ALREADY_EXISTS'
+        },
+        { status: 409 }
+      )
+    }
+
+    const hashedPassword = await hashPassword(validatedData.password)
+
+    const user = await prisma.user.create({
+      data: {
+        name: validatedData.name,
+        email: normalizedEmail,
+        passwordHash: hashedPassword,
+        phoneNumber: validatedData.phoneNumber,
+        age: validatedData.age,
+        skillLevel: validatedData.skillLevel,
+        role: 'PLAYER',
+        roleUpdatedAt: new Date(),
+        isActive: true,
+        isVerified: false,
+        emailVerifiedAt: null
+      }
+    })
+
+    logger.info({ requestId, userId: user.id }, 'Registration successful')
+    
+    return NextResponse.json({
+      success: true,
+      message: 'تم إنشاء الحساب بنجاح',
+      data: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        requiresVerification: true
+      }
+    }, { status: 201 })
+
+  } catch (error: any) {
+    if (error.name === 'ZodError') {
+      const firstError = error.errors[0]
+      logger.warn({ requestId, error: firstError.message }, 'Validation error in registration')
+      return NextResponse.json(
+        { 
+          success: false,
+          error: firstError.message,
+          code: 'VALIDATION_ERROR'
+        },
+        { status: 400 }
+      )
+    }
+
+    if (error.message.includes('لقد تجاوزت الحد المسموح')) {
+      logger.warn({ requestId, error: error.message }, 'Rate limit exceeded')
+      return NextResponse.json(
+        { 
+          success: false,
+          error: error.message,
+          code: 'RATE_LIMIT_EXCEEDED'
+        },
+        { status: 429 }
+      )
+    }
+
+    logger.error('Registration error', error, { requestId })
+    return NextResponse.json(
+      { 
+        success: false,
+        error: 'فشل في إنشاء الحساب',
+        code: 'INTERNAL_SERVER_ERROR'
+      },
+      { status: 500 }
+    )
+  }
+}
+// app/api/auth/me/route.ts
+import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/infrastructure/auth/auth-options'
+import { prisma } from '@/lib/infrastructure/database/prisma'
+import { successResponse, errorResponse } from '@/lib/infrastructure/auth/responses'
+import { logger } from '@/lib/shared/logger'
+
+// ✅ أضف هذا لتحديد أن المسار ديناميكي
+export const dynamic = 'force-dynamic'
+
+export const GET = async () => {
+  const requestId = `auth_me_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+  try {
+    logger.info({ requestId }, 'Fetching user data')
+
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user?.id) {
+      logger.warn({ requestId }, 'Unauthorized access to /api/auth/me')
+      return NextResponse.json(
+        errorResponse('يجب تسجيل الدخول أولاً', 'UNAUTHORIZED'),
         { status: 401 }
       )
     }
 
-    const { bookingId, amount, currency = 'EGP', idempotencyKey } = await request.json()
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phoneNumber: true,
+        age: true,
+        description: true,
+        skillLevel: true,
+        role: true,
+        isVerified: true,
+        isActive: true,
+        lastLogin: true,
+        createdAt: true,
+        updatedAt: true,
+      }
+    })
 
-    if (!bookingId || !amount) {
-      logger.warn({ requestId, bookingId, amount }, 'Incomplete payment data')
+    if (!user) {
+      logger.warn({ requestId, userId: session.user.id }, 'User not found')
       return NextResponse.json(
-        { error: 'بيانات الدفع غير مكتملة' },
-        { status: 400 }
+        errorResponse('المستخدم غير موجود', 'USER_NOT_FOUND'),
+        { status: 404 }
       )
     }
 
-    if (amount <= 0) {
-      logger.warn({ requestId, amount }, 'Invalid payment amount')
+    if (!user.isActive) {
+      logger.warn({ requestId, userId: user.id }, 'Inactive account accessed')
       return NextResponse.json(
-        { error: 'قيمة الدفع غير صالحة' },
-        { status: 400 }
+        errorResponse('الحساب غير نشط', 'ACCOUNT_INACTIVE'),
+        { status: 403 }
       )
     }
 
-    // 🔧 التعديل هنا
-    const result = await BookingOrchestrator.initiatePayment({  // ✅ BookingOrchestrator.
-      bookingId,
-      amount,
-      currency,
-      idempotencyKey,
-      userId,
-    })
+    logger.info({ requestId, userId: user.id }, 'User data fetched successfully')
 
-    logger.info({
-      requestId,
-      bookingId,
-      orderId: result.orderId,
-      userId
-    }, 'Payment initiated successfully')
-
-    return NextResponse.json({
-      success: true,
-      data: result,
-      message: 'تم بدء عملية الدفع بنجاح'
-    })
-
-  } catch (error: any) {
-    logger.error('Payment creation error', error, { requestId })
-    return apiErrorHandler(error)
-  }
-}
-// app/api/webhooks/paymob/route.ts
-import { NextRequest } from 'next/server'
-import { BookingOrchestrator } from '@/lib/application/services/booking-orchestrator'
-import { paymobService } from '@/lib/infrastructure/payments/providers'
-import { assertWebhookValid } from '@/lib/domain/guards/payment-guards'
-import { apiErrorHandler } from '@/lib/shared/api/api-error-handler'
-import { logger } from '@/lib/shared/logger'
-import { parseISO, differenceInMinutes } from 'date-fns'
-
-export async function POST(request: NextRequest) {
-  const webhookId = `webhook_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-
-  try {
-    logger.info({
-      webhookId,
-      ip: request.headers.get('x-forwarded-for') || 'unknown',
-      userAgent: request.headers.get('user-agent') || 'unknown'
-    }, 'Processing Paymob webhook')
-
-    const body = await request.json()
-    const hmac = request.headers.get('hmac')
-
-    if (!hmac) {
-      logger.error({
-        webhookId,
-        headers: Object.fromEntries(request.headers.entries())
-      }, 'HMAC header missing')
-      return apiErrorHandler(new Error('HMAC header missing'))
-    }
-
-    // 1️⃣ التحقق من HMAC
-    if (!paymobService.verifyHMAC(body.obj, hmac)) {
-      logger.error({
-        webhookId,
-        hmac,
-        bodyHash: JSON.stringify(body.obj).length
-      }, 'Invalid HMAC signature')
-      return apiErrorHandler(new Error('Invalid HMAC signature'))
-    }
-
-    // 2️⃣ استخراج البيانات
-    const {
-      success,
-      amount_cents,
-      id: transactionId,
-      order: { id: orderId, merchant_order_id: bookingId },
-      created_at,
-      currency = 'EGP'
-    } = body.obj
-
-    const createdAt = parseISO(created_at)
-    const now = new Date()
-    const minutesDiff = differenceInMinutes(now, createdAt)
-
-    logger.info({
-      webhookId,
-      bookingId,
-      orderId,
-      transactionId,
-      success,
-      amount: amount_cents / 100,
-      created_at: createdAt.toISOString(),
-      minutesAgo: minutesDiff,
-      currency
-    }, 'Webhook data extracted')
-
-    if (minutesDiff > 60) {
-      logger.warn({
-        webhookId,
-        minutesDiff,
-        created_at: createdAt.toISOString(),
-        received_at: now.toISOString()
-      }, 'Webhook is too old, ignoring')
-      return new Response('OK', {
-        status: 200,
-        headers: {
-          'Content-Type': 'text/plain',
-          'X-Webhook-Status': 'IGNORED_OLD'
+    return NextResponse.json(
+      successResponse('تم جلب بيانات المستخدم بنجاح', {
+        user: {
+          ...user,
+          lastLogin: user.lastLogin?.toISOString(),
+          createdAt: user.createdAt.toISOString(),
+          updatedAt: user.updatedAt.toISOString()
         }
-      })
-    }
+      }, '/api/auth/me')
+    )
 
-    // 3️⃣ التحقق من صحة الـ webhook
-    const payment = await assertWebhookValid({
-      orderId: orderId.toString(),
-      transactionId: transactionId.toString(),
-      amount: amount_cents / 100
-    })
-
-    logger.info({
-      webhookId,
-      paymentId: payment.id,
-      bookingId: payment.bookingId,
-      previousStatus: payment.status,
-      created_at: createdAt.toISOString(),
-      processingDelay: minutesDiff
-    }, 'Webhook validated')
-
-    // 4️⃣ معالجة الحجز
-    const processingStart = Date.now()
-
-    await BookingOrchestrator.completeBooking({
-      bookingId: payment.bookingId,
-      success: Boolean(success),
-      paymentDetails: {
-        transactionId: transactionId.toString(),
-        orderId: orderId.toString(),
-        amount: amount_cents / 100,
-        currency
-      }
-    })
-
-    const processingTime = Date.now() - processingStart
-
-    logger.info({
-      webhookId,
-      bookingId: payment.bookingId,
-      success,
-      processingTime,
-      totalTimeFromCreation: minutesDiff + processingTime / 60000
-    }, 'Booking processing completed')
-
-    return new Response('OK', {
-      status: 200,
-      headers: {
-        'Content-Type': 'text/plain',
-        'X-Webhook-ID': webhookId,
-        'X-Processing-Time': processingTime.toString(),
-        'X-Booking-ID': payment.bookingId
-      }
-    })
   } catch (error: any) {
-    logger.error('Webhook processing error', error, {
-      webhookId,
-      url: request.url,
-      body: JSON.stringify(await request.json()).substring(0, 500)
-    })
-
-    return new Response('ERROR', {
-      status: 500,
-      headers: {
-        'Content-Type': 'text/plain',
-        'X-Webhook-Status': 'ERROR',
-        'X-Error-Message': error.message.substring(0, 100)
-      }
-    })
+    logger.error('Error in /api/auth/me', error, { requestId })
+    return NextResponse.json(
+      errorResponse('خطأ في جلب بيانات المستخدم', 'INTERNAL_ERROR'),
+      { status: 500 }
+    )
   }
 }
-//app/page.tsx
-import { redirect } from 'next/navigation'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/infrastructure/auth/auth-options'
-import Header from '@/components/layout/header'
-import Footer from '@/components/layout/footer'
-import HeroSection from '@/components/home/hero-section'
-import FeaturedFields from '@/components/home/featured-fields'
-import HowItWorks from '@/components/home/how-it-works'
-import MainCardsGrid from '@/components/home/main-cards-grid'
+// app/api/auth/[...nextauth]/route.ts
+import NextAuth from 'next-auth'
+import { authOptions } from '@/lib/infrastructure/auth/auth-options'  // ✅ المسار الجديد
 
-export default async function HomePage() {
-  const session = await getServerSession(authOptions)
+const handler = NextAuth(authOptions)
+
+export { handler as GET, handler as POST }
+import { NextRequest, NextResponse } from 'next/server'
+import { getToken } from 'next-auth/jwt'
+
+export default async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
   
-  // توجيه المستخدم المسجل إلى dashboard
-  if (session) {
-    redirect('/dashboard')
-  }
-  
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      <Header />
-      <main className="container mx-auto px-4 py-8">
-        <section className="mb-16">
-          <HeroSection />
-        </section>
-        
-        <section className="my-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-900 mb-12">
-            ابدأ حجزك الآن
-          </h2>
-          <MainCardsGrid />
-        </section>
-        
-        <section className="my-16">
-          <HowItWorks />
-        </section>
-        
-        <section className="my-16">
-          <FeaturedFields />
-        </section>
-        
-        <section className="text-center my-16 bg-blue-50 rounded-2xl p-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            انضم إلى مجتمعنا
-          </h2>
-          <p className="text-gray-600 mb-6 max-w-2xl mx-auto">
-            سجل الآن وتمتع بتجربة حجز ملاعب سلسة وإدارة فعالة
-          </p>
-          <div className="flex justify-center gap-4">
-            <a 
-              href="/login" 
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-            >
-              تسجيل الدخول
-            </a>
-            <a 
-              href="/register" 
-              className="px-6 py-3 bg-white text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 transition"
-            >
-              إنشاء حساب
-            </a>
-          </div>
-        </section>
-      </main>
-      <Footer />
-    </div>
-  )
-}
-//app/layout.tsx
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import './globals.css'
-import AuthProvider from '@/components/providers/Authprovider'
-
-const inter = Inter({ subsets: ['latin'] })
-
-export const metadata: Metadata = {
-  title: 'احجزلي - نظام حجز الملاعب',
-  description: 'نظام حجز الملاعب الرياضية',
-}
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  return (
-    <html lang="ar" dir="rtl">
-      <body className={inter.className}>
-        <AuthProvider>
-          {children}
-        </AuthProvider>
-      </body>
-    </html>
-  )
-}
-//app/(auth)/layout.tsx
-import type { Metadata } from 'next'
-
-export const metadata: Metadata = {
-  title: 'نظام حجز الملاعب الرياضية',
-  description: 'نظام متكامل لحجز الملاعب الرياضية',
-}
-
-export default function AuthLayout({ 
-  children 
-}: { 
-  children: React.ReactNode 
-}) {
-  return (
-    <div className="min-h-screen">
-      {children}
-    </div>
-  )
-}
-// app/(auth)/register/page.tsx
-'use client'
-
-import { useState } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { registerSchema, type RegisterInput } from '@/lib/infrastructure/auth/validators' // ✅ المسار الجديد
-import { 
-  User, Mail, Lock, Phone, Calendar, Star, FileText, ShieldCheck, Check, X, 
-  Sparkles, Target, Trophy 
-} from 'lucide-react'
-import Button from '@/components/ui/button'
-import Input from '@/components/ui/input'
-import Alert from '@/components/ui/alert'
-import { cn } from '@/lib/shared/utils' // يمكنك إنشاء هذا الملف
-
-export default function RegisterPage() {
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [skillLevel, setSkillLevel] = useState<'WEAK' | 'AVERAGE' | 'GOOD' | 'EXCELLENT' | 'LEGENDARY'>('AVERAGE')
-  const router = useRouter()
-  
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    watch,
-    setValue
-  } = useForm<RegisterInput>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: {
-      name: '',
-      email: '',
-      password: '',
-      confirmPassword: '',
-      phoneNumber: '',
-      age: undefined,
-      description: '',
-      skillLevel: 'AVERAGE'
-    }
-  })
-
-  // ✅ التعديل: إزالة useAuth() واستخدام fetch مباشرة
-  const registerUser = async (data: RegisterInput) => {
-    const response = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
+  // 1️⃣ تحقق من وجود الـ SECRET أولاً
+  if (!process.env.NEXTAUTH_SECRET) {
+    console.error('❌ [MIDDLEWARE ERROR] NEXTAUTH_SECRET is not defined')
     
-    const result = await response.json();
-    if (!result.success) throw new Error(result.error);
-    
-    // Redirect to login
-    router.push('/login?registered=true');
-  };
-
-  const password = watch('password')
-  const confirmPassword = watch('confirmPassword')
-  const description = watch('description')
-
-  // ✅ التعديل: سياسة باسورد مبسطة (6 أحرف فقط)
-  const passwordChecks = [
-    { label: '6 أحرف على الأقل', check: password?.length >= 6 },
-    { label: 'أقل من 72 حرفاً', check: password?.length <= 72 },
-  ];
-
-  const onSubmit = async (data: RegisterInput) => {
-    setIsLoading(true)
-    setError('')
-    
-    try {
-      // ✅ استخدام الدالة الجديدة
-      await registerUser(data)
-    } catch (err: any) {
-      setError(err.message || 'فشل في التسجيل')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const skillLevels = [
-    { value: 'WEAK' as const, label: 'ضعيف', desc: 'مبتدئ', icon: '😅' },
-    { value: 'AVERAGE' as const, label: 'متوسط', desc: 'لديه خبرة', icon: '😊' },
-    { value: 'GOOD' as const, label: 'جيد', desc: 'متمكن', icon: '😎' },
-    { value: 'EXCELLENT' as const, label: 'ممتاز', desc: 'محترف', icon: '🔥' },
-    { value: 'LEGENDARY' as const, label: 'أسطوري', desc: 'خبير', icon: '👑' }
-  ]
-
-  const passwordStrength = passwordChecks.filter(check => check.check).length
-  const strengthPercentage = (passwordStrength / 2) * 100
-  const strengthColor = passwordStrength <= 1 ? 'red' : 'green'
-  const strengthText = passwordStrength <= 1 ? 'ضعيفة' : 'جيدة'
-
-  const selectedSkill = skillLevels.find(level => level.value === skillLevel)
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900">
-      {/* Animated Background Elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl" />
-        <div className="absolute top-1/3 -left-40 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-40 right-1/4 w-60 h-60 bg-pink-500/10 rounded-full blur-3xl" />
-      </div>
-
-      <div className="container mx-auto px-4 py-8 relative">
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* Left Side - Welcome & Features */}
-          <div className="lg:w-2/5 flex flex-col justify-center text-white p-6 lg:p-12">
-            <div className="mb-12">
-              <div className="inline-flex items-center gap-3 mb-6">
-                <div className="p-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl shadow-2xl">
-                  <Sparkles className="w-10 h-10 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400">
-                    مرحباً بك
-                  </h1>
-                  <p className="text-2xl font-semibold text-gray-300 mt-2">في عالم الألعاب</p>
-                </div>
-              </div>
-              <p className="text-xl text-gray-300 leading-relaxed">
-                انضم إلى آلاف اللاعبين المحترفين وابدأ رحلتك نحو التميز. 
-                أنشئ ملفك الشخصي واكتشف عالماً من التحديات والإنجازات.
-              </p>
-            </div>
-            
-            <div className="space-y-6">
-              {/* Feature 1 */}
-              <div className="bg-gradient-to-r from-white/5 to-white/0 p-6 rounded-2xl border border-white/10 backdrop-blur-sm hover:border-white/20 transition-all duration-300">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-gradient-to-br from-blue-500/30 to-blue-600/30 rounded-xl">
-                    <ShieldCheck className="w-8 h-8 text-blue-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-semibold text-white">تسجيل سهل</h3>
-                    <p className="text-gray-400 mt-1">تسجيل بسيط بدون تعقيدات</p>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Feature 2 */}
-              <div className="bg-gradient-to-r from-white/5 to-white/0 p-6 rounded-2xl border border-white/10 backdrop-blur-sm hover:border-white/20 transition-all duration-300">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-gradient-to-br from-purple-500/30 to-purple-600/30 rounded-xl">
-                    <Target className="w-8 h-8 text-purple-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-semibold text-white">تحديات مناسبة</h3>
-                    <p className="text-gray-400 mt-1">تحديات تلائم مستواك وتطور مهاراتك</p>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Feature 3 */}
-              <div className="bg-gradient-to-r from-white/5 to-white/0 p-6 rounded-2xl border border-white/10 backdrop-blur-sm hover:border-white/20 transition-all duration-300">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 bg-gradient-to-br from-green-500/30 to-green-600/30 rounded-xl">
-                    <Trophy className="w-8 h-8 text-green-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-semibold text-white">انجازات وجوائز</h3>
-                    <p className="text-gray-400 mt-1">احصل على مكافآت وتقدم في المراتب</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Stats */}
-            <div className="mt-12 grid grid-cols-3 gap-4">
-              <div className="text-center p-4 bg-white/5 rounded-xl border border-white/10">
-                <div className="text-2xl font-bold text-white">10K+</div>
-                <div className="text-sm text-gray-400 mt-1">لاعب نشط</div>
-              </div>
-              <div className="text-center p-4 bg-white/5 rounded-xl border border-white/10">
-                <div className="text-2xl font-bold text-white">500+</div>
-                <div className="text-sm text-gray-400 mt-1">تحدي يومي</div>
-              </div>
-              <div className="text-center p-4 bg-white/5 rounded-xl border border-white/10">
-                <div className="text-2xl font-bold text-white">99%</div>
-                <div className="text-sm text-gray-400 mt-1">رضا عملاء</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Side - Registration Form */}
-          <div className="lg:w-3/5">
-            <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl overflow-hidden">
-              {/* Form Header */}
-              <div className="p-8 border-b border-white/10">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-3xl font-bold text-white">إنشاء حساب جديد</h2>
-                    <p className="text-gray-300 mt-2">املأ المعلومات لبدء رحلتك</p>
-                  </div>
-                  <div className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full">
-                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                    <span className="text-sm text-gray-300">نظام آمن</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Form Content */}
-              <div className="p-8">
-                {error && (
-                  <Alert 
-                    type="error" 
-                    title="خطأ في التسجيل" 
-                    message={error} 
-                    className="mb-6 animate-in slide-in-from-top duration-300"
-                  />
-                )}
-
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-                  {/* Personal Information */}
-                  <div>
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="p-2 bg-blue-500/20 rounded-lg">
-                        <User className="w-5 h-5 text-blue-400" />
-                      </div>
-                      <h3 className="text-xl font-semibold text-white">المعلومات الشخصية</h3>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <Input
-                        label="الاسم الكامل"
-                        type="text"
-                        placeholder="أحمد محمد"
-                        error={errors.name?.message}
-                        icon={<User className="w-5 h-5" />}
-                        {...register('name')}
-                        disabled={isLoading}
-                      />
-
-                      <Input
-                        label="البريد الإلكتروني"
-                        type="email"
-                        placeholder="ahmed@example.com"
-                        error={errors.email?.message}
-                        icon={<Mail className="w-5 h-5" />}
-                        {...register('email')}
-                        disabled={isLoading}
-                      />
-
-                      <Input
-                        label="رقم الهاتف"
-                        type="tel"
-                        placeholder="+20 100 000 0000"
-                        error={errors.phoneNumber?.message}
-                        icon={<Phone className="w-5 h-5" />}
-                        {...register('phoneNumber')}
-                        disabled={isLoading}
-                      />
-
-                      <Input
-                        label="العمر"
-                        type="number"
-                        placeholder="25"
-                        min="13"
-                        max="100"
-                        error={errors.age?.message}
-                        icon={<Calendar className="w-5 h-5" />}
-                        {...register('age', { valueAsNumber: true })}
-                        disabled={isLoading}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Password Section */}
-                  <div>
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="p-2 bg-purple-500/20 rounded-lg">
-                        <Lock className="w-5 h-5 text-purple-400" />
-                      </div>
-                      <h3 className="text-xl font-semibold text-white">كلمة المرور</h3>
-                      <span className="text-sm text-gray-400">(سياسة بسيطة - 6 أحرف على الأقل)</span>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <Input
-                        label="كلمة المرور"
-                        type="password"
-                        placeholder="••••••••"
-                        error={errors.password?.message}
-                        icon={<Lock className="w-5 h-5" />}
-                        {...register('password')}
-                        disabled={isLoading}
-                      />
-
-                      <Input
-                        label="تأكيد كلمة المرور"
-                        type="password"
-                        placeholder="••••••••"
-                        error={errors.confirmPassword?.message}
-                        icon={<Lock className="w-5 h-5" />}
-                        {...register('confirmPassword')}
-                        disabled={isLoading}
-                      />
-                    </div>
-
-                    {/* Password Strength */}
-                    {password && (
-                      <div className="mt-6 p-5 bg-gradient-to-r from-white/5 to-white/0 rounded-xl border border-white/10">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-2">
-                            <ShieldCheck className="w-5 h-5 text-white" />
-                            <span className="text-white font-medium">قوة كلمة المرور</span>
-                          </div>
-                          <span className={cn(
-                            "text-sm font-semibold",
-                            strengthColor === 'red' ? 'text-red-400' : 'text-green-400'
-                          )}>
-                            {strengthText}
-                          </span>
-                        </div>
-                        
-                        <div className="space-y-3">
-                          <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                            <div 
-                              className={cn(
-                                "h-full transition-all duration-500",
-                                strengthColor === 'red' ? 'bg-red-500' : 'bg-green-500'
-                              )}
-                              style={{ width: `${strengthPercentage}%` }}
-                            />
-                          </div>
-                          
-                          <div className="grid grid-cols-2 gap-2">
-                            {passwordChecks.map((check, index) => (
-                              <div 
-                                key={index}
-                                className={cn(
-                                  "flex items-center gap-2 text-xs p-2 rounded-lg transition-all duration-300",
-                                  check.check 
-                                    ? 'bg-green-500/20 text-green-300 border border-green-500/30' 
-                                    : 'bg-red-500/10 text-red-300 border border-red-500/20'
-                                )}
-                              >
-                                {check.check ? (
-                                  <Check className="w-3 h-3 text-green-400" />
-                                ) : (
-                                  <X className="w-3 h-3 text-red-400" />
-                                )}
-                                <span>{check.label}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Password Match Check */}
-                        {password && confirmPassword && (
-                          <div className="mt-4 p-3 rounded-lg bg-white/5">
-                            <div className={cn(
-                              "flex items-center gap-2 text-sm",
-                              password === confirmPassword 
-                                ? 'text-green-400' 
-                                : 'text-red-400'
-                            )}>
-                              {password === confirmPassword ? (
-                                <Check className="w-4 h-4" />
-                              ) : (
-                                <X className="w-4 h-4" />
-                              )}
-                              <span>
-                                {password === confirmPassword 
-                                  ? 'كلمات المرور متطابقة' 
-                                  : 'كلمات المرور غير متطابقة'}
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Skill Level */}
-                  <div>
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="p-2 bg-orange-500/20 rounded-lg">
-                        <Star className="w-5 h-5 text-orange-400" />
-                      </div>
-                      <h3 className="text-xl font-semibold text-white">مستوى المهارة</h3>
-                    </div>
-                    
-                    <div className="mb-4">
-                      <p className="text-gray-300 text-sm">
-                        اختر مستوى مهارتك الحالي لتلائمك التحديات المناسبة
-                      </p>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                      {skillLevels.map((level: any) => (
-                        <button
-                          type="button"
-                          key={level.value}
-                          onClick={() => {
-                            setSkillLevel(level.value)
-                            setValue('skillLevel', level.value)
-                          }}
-                          className={cn(
-                            "relative flex flex-col items-center p-4 rounded-xl border-2 transition-all duration-300",
-                            "transform hover:scale-105 active:scale-95",
-                            skillLevel === level.value 
-                              ? 'border-white shadow-lg scale-105 bg-gradient-to-br from-orange-500/30 to-orange-600/30' 
-                              : 'border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/30'
-                          )}
-                        >
-                          <div className="text-2xl mb-2">{level.icon}</div>
-                          <div className="text-sm font-semibold text-white">{level.label}</div>
-                          <div className="text-xs text-white/70 mt-1">{level.desc}</div>
-                        </button>
-                      ))}
-                    </div>
-                    
-                    {selectedSkill && skillLevel === selectedSkill.value && (
-                      <div className="mt-4 p-4 bg-gradient-to-r from-white/5 to-white/0 rounded-xl border border-white/10">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-white/10 rounded-lg">
-                            <span className="text-xl">{selectedSkill.icon}</span>
-                          </div>
-                          <div>
-                            <h4 className="text-white font-medium">مستوى {selectedSkill.label}</h4>
-                            <p className="text-gray-300 text-sm mt-1">
-                              {selectedSkill.desc} - ستتلقى تحديات مناسبة لمستواك
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {errors.skillLevel?.message && (
-                      <p className="text-sm text-red-400 mt-3">{errors.skillLevel.message}</p>
-                    )}
-                  </div>
-
-                  {/* Description */}
-                  <div>
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="p-2 bg-pink-500/20 rounded-lg">
-                        <FileText className="w-5 h-5 text-pink-400" />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-semibold text-white">الوصف الشخصي</h3>
-                        <p className="text-gray-300 text-sm">(اختياري) شاركنا شيئاً عن نفسك</p>
-                      </div>
-                    </div>
-                    
-                    <textarea
-                      placeholder="أخبرنا عن نفسك، هواياتك، اهتماماتك، ومهاراتك في الألعاب..."
-                      rows={3}
-                      maxLength={500}
-                      {...register('description')}
-                      disabled={isLoading}
-                      className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-xl
-                               text-white placeholder-gray-400 focus:outline-none 
-                               focus:ring-2 focus:ring-blue-500 focus:border-transparent
-                               transition-all resize-none"
-                    />
-                    <div className="flex justify-between items-center mt-2">
-                      <div className="text-xs text-gray-400">
-                        {description?.length || 0} / 500 حرف
-                      </div>
-                      <div className={cn(
-                        "text-xs font-medium",
-                        (description?.length || 0) >= 450 
-                          ? 'text-orange-400 animate-pulse' 
-                          : 'text-gray-400'
-                      )}>
-                        {description && description.length >= 450 && 'اقتربت من الحد الأقصى'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Terms & Conditions */}
-                  <div className="p-5 bg-gradient-to-r from-white/5 to-white/0 rounded-xl border border-white/10">
-                    <div className="flex items-start gap-4">
-                      <input
-                        type="checkbox"
-                        id="terms"
-                        className="mt-1 w-5 h-5 rounded border-white/30 bg-white/10 
-                                 text-blue-500 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900"
-                        required
-                      />
-                      <div>
-                        <label htmlFor="terms" className="text-gray-300 text-sm leading-relaxed">
-                          أنا أوافق على جميع{' '}
-                          <Link 
-                            href="/terms" 
-                            className="text-blue-400 hover:text-blue-300 underline hover:no-underline font-medium"
-                          >
-                            الشروط والأحكام
-                          </Link>{' '}
-                          و{' '}
-                          <Link 
-                            href="/privacy" 
-                            className="text-blue-400 hover:text-blue-300 underline hover:no-underline font-medium"
-                          >
-                            سياسة الخصوصية
-                          </Link>{' '}
-                          الخاصة بالمنصة. أقر بأن جميع البيانات التي قدمتها صحيحة وأتحمل المسؤولية الكاملة عنها.
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Submit Button */}
-                  <Button
-                    type="submit"
-                    className="w-full py-4 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500
-                             hover:from-blue-600 hover:via-purple-600 hover:to-pink-600 
-                             text-white font-bold text-lg rounded-xl shadow-2xl
-                             transform hover:-translate-y-1 active:translate-y-0
-                             transition-all duration-300"
-                    loading={isLoading}
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        جاري إنشاء الحساب...
-                      </span>
-                    ) : (
-                      <span className="flex items-center justify-center gap-2">
-                        <Sparkles className="w-5 h-5" />
-                        إنشاء حسابي والبدء
-                      </span>
-                    )}
-                  </Button>
-                </form>
-
-                {/* Login Link */}
-                <div className="mt-8 pt-6 border-t border-white/10">
-                  <p className="text-center text-gray-300 text-sm">
-                    لديك حساب بالفعل؟{' '}
-                    <Link
-                      href="/login"
-                      className="font-bold text-blue-400 hover:text-blue-300 
-                               underline hover:no-underline transition-all duration-300
-                               hover:tracking-wider"
-                    >
-                      تسجيل الدخول
-                    </Link>
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-//app/(auth)/login/page.tsx
-import { Suspense } from 'react'
-import LoginContent from './LoginContent'
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={<LoginSkeleton />}>
-      <LoginContent />
-    </Suspense>
-  )
-}
-
-function LoginSkeleton() {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-block p-4 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl mb-4 animate-pulse">
-            <div className="w-12 h-12"></div>
-          </div>
-          <h1 className="text-4xl font-bold text-white mb-2">مرحباً بعودتك!</h1>
-          <p className="text-gray-300">جاري تحميل...</p>
-        </div>
-      </div>
-    </div>
-  )
-}
-//app/(auth)/login/loginContent.tsx
-'use client'
-
-import { useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { signIn } from 'next-auth/react'
-import { loginSchema, type LoginInput } from '@/lib/infrastructure/auth/validators'
-import { LogIn, Mail, Lock, Gamepad2 } from 'lucide-react'
-import { FcGoogle } from 'react-icons/fc'
-import Button from '@/components/ui/button'
-import Input from '@/components/ui/input'
-import Card from '@/components/ui/card'
-import Alert from '@/components/ui/alert'
-import toast from 'react-hot-toast'
-
-export default function LoginContent() {
-  const [isLoading, setIsLoading] = useState(false)
-  const [googleLoading, setGoogleLoading] = useState(false)
-  const [error, setError] = useState('')
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<LoginInput>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: '',
-      password: ''
-    }
-  })
-
-  const onSubmit = async (data: LoginInput) => {
-    setIsLoading(true)
-    setError('')
-    
-    try {
-      const result = await signIn('credentials', {
-        email: data.email,
-        password: data.password,
-        redirect: false,
+    if (process.env.NODE_ENV === 'production') {
+      return new NextResponse('Server configuration error', { 
+        status: 500,
+        headers: { 'Content-Type': 'text/plain' }
       })
-
-      if (result?.error) {
-        toast.error(result.error)
-        setError(result.error)
-      } else if (result?.ok) {
-        toast.success('تم تسجيل الدخول بنجاح')
-        router.push('/dashboard')
-        router.refresh()
-      }
-    } catch (err: any) {
-      toast.error(err.message || 'فشل تسجيل الدخول')
-      setError(err.message || 'فشل تسجيل الدخول')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleGoogleSignIn = async () => {
-    setGoogleLoading(true)
-    setError('')
-    
-    try {
-      const result = await signIn('google', {
-        redirect: false,
-        callbackUrl: '/dashboard'
-      })
-      
-      if (result?.error) {
-        toast.error(result.error)
-        setError(result.error)
-      } else if (result?.ok) {
-        toast.success('تم تسجيل الدخول بنجاح')
-        router.push('/dashboard')
-        router.refresh()
-      }
-    } catch (err: any) {
-      toast.error(err.message || 'فشل تسجيل الدخول بجوجل')
-      setError(err.message || 'فشل تسجيل الدخول بجوجل')
-    } finally {
-      setGoogleLoading(false)
-    }
-  }
-
-  const redirect = searchParams.get('redirect')
-  const registered = searchParams.get('registered')
-  const accountError = searchParams.get('error')
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-block p-4 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl mb-4">
-            <Gamepad2 className="w-12 h-12 text-white" />
-          </div>
-          <h1 className="text-4xl font-bold text-white mb-2">مرحباً بعودتك!</h1>
-          <p className="text-gray-300">سجل دخولك وابدأ رحلتك</p>
-        </div>
-
-        <Card className="p-8 bg-white/10 backdrop-blur-lg border border-white/20">
-          {registered && (
-            <Alert 
-              type="success" 
-              title="تم التسجيل بنجاح" 
-              message="تم إنشاء حسابك، يمكنك تسجيل الدخول الآن" 
-              className="mb-6"
-            />
-          )}
-
-          {redirect && (
-            <Alert 
-              type="info" 
-              title="مطلوب تسجيل دخول" 
-              message="يجب تسجيل الدخول للوصول إلى هذه الصفحة" 
-              className="mb-6"
-            />
-          )}
-
-          {accountError === 'account_inactive' && (
-            <Alert 
-              type="error" 
-              title="الحساب غير نشط" 
-              message="حسابك غير نشط حالياً، يرجى التواصل مع الدعم" 
-              className="mb-6"
-            />
-          )}
-
-          {error && (
-            <Alert 
-              type="error" 
-              title="فشل تسجيل الدخول" 
-              message={error} 
-              className="mb-6"
-            />
-          )}
-
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            <div className="relative">
-              <div className="absolute right-3 top-3 text-gray-400">
-                <Mail className="w-5 h-5" />
-              </div>
-              <Input
-                label="البريد الإلكتروني"
-                type="email"
-                placeholder="you@example.com"
-                error={errors.email?.message}
-                {...register('email')}
-                disabled={isLoading || googleLoading}
-                className="bg-white/5 border-white/20 text-white pr-10"
-              />
-            </div>
-
-            <div className="relative">
-              <div className="absolute right-3 top-3 text-gray-400">
-                <Lock className="w-5 h-5" />
-              </div>
-              <Input
-                label="كلمة المرور"
-                type="password"
-                placeholder="••••••••"
-                error={errors.password?.message}
-                {...register('password')}
-                disabled={isLoading || googleLoading}
-                className="bg-white/5 border-white/20 text-white pr-10"
-              />
-            </div>
-
-            <Button
-              type="submit"
-              className="w-full py-4 bg-gradient-to-r from-blue-500 to-purple-500
-                       hover:from-blue-600 hover:to-purple-600 text-white font-semibold
-                       rounded-xl shadow-lg hover:shadow-xl transition-all duration-300
-                       flex items-center justify-center gap-2"
-              loading={isLoading}
-              disabled={isLoading || googleLoading}
-            >
-              {isLoading ? 'جاري تسجيل الدخول...' : (
-                <>
-                  <LogIn className="w-5 h-5" />
-                  تسجيل الدخول
-                </>
-              )}
-            </Button>
-          </form>
-
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-white/20"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-transparent text-gray-300">أو</span>
-              </div>
-            </div>
-
-            <Button
-              type="button"
-              onClick={handleGoogleSignIn}
-              className="w-full mt-6 py-4 bg-white text-gray-900 hover:bg-gray-100
-                       border border-gray-300 rounded-xl shadow-md
-                       flex items-center justify-center gap-2 transition-all duration-300"
-              loading={googleLoading}
-              disabled={isLoading || googleLoading}
-            >
-              {googleLoading ? 'جاري تسجيل الدخول...' : (
-                <>
-                  <FcGoogle className="w-5 h-5" />
-                  تسجيل الدخول بجوجل
-                </>
-              )}
-            </Button>
-          </div>
-
-          <div className="mt-8 pt-6 border-t border-white/20">
-            <p className="text-center text-gray-300 text-sm mb-4">
-              ليس لديك حساب؟{' '}
-              <Link
-                href="/register"
-                className="font-medium text-blue-400 hover:text-blue-300 underline"
-              >
-                إنشاء حساب جديد
-              </Link>
-            </p>
-            <p className="text-center text-gray-300 text-sm">
-              <Link
-                href="/"
-                className="font-medium text-blue-400 hover:text-blue-300 underline"
-              >
-                العودة للصفحة الرئيسية
-              </Link>
-            </p>
-          </div>
-        </Card>
-      </div>
-    </div>
-  )
-}
-//app/(dashboard)/page.tsx
-import { redirect } from 'next/navigation'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/infrastructure/auth/auth-options'
-
-export default async function DashboardPage() {
-  const session = await getServerSession(authOptions)
-  
-  // إذا لم يكن هناك session، ارجع للصفحة الرئيسية
-  // الـ middleware سيتولى التوجيه إلى /login إذا حاول الدخول مباشرة
-  if (!session) {
-    redirect('/')
-  }
-  
-  const userRole = session.user.role as 'PLAYER' | 'ADMIN' | 'OWNER' | 'EMPLOYEE'
-  
-  // توجيه حسب الدور
-  switch (userRole) {
-    case 'PLAYER':
-      redirect('/dashboard/player')
-    case 'ADMIN':
-      redirect('/dashboard/admin')
-    case 'OWNER':
-      redirect('/dashboard/owner')
-    case 'EMPLOYEE':
-      redirect('/dashboard/employee')
-    default:
-      redirect('/')
-  }
-}
-//app/(dashboard)/layout.tsx
-export default function PlayerLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {children}
-    </div>
-  )
-}
-//app/(dashboard)/(player)/page.tsx
-'use client'
-
-import { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
-import DaySelector from '@/components/booking/day-selector'
-import SlotGrid from '@/components/booking/slot-grid'
-import { Day } from '@/lib/core/types'
-
-export default function PlayerDashboard() {
-  const { data: session } = useSession()
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
-  const [slots, setSlots] = useState<any[]>([])
-  const [field, setField] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  
-  // إنشاء أيام بالشكل المطلوب لـ DaySelector
-  const generateNextDays = (count: number): Day[] => {
-    const days: Day[] = []
-    const today = new Date()
-    
-    for (let i = 0; i < count; i++) {
-      const date = new Date(today)
-      date.setDate(today.getDate() + i)
-      
-      const dayOfWeek = date.getDay()
-      const isWeekend = dayOfWeek === 5 || dayOfWeek === 6
-      const isToday = i === 0
-      const isTomorrow = i === 1
-      
-      // تنسيق التاريخ بالعربي
-      const weekday = date.toLocaleDateString('ar-SA', { weekday: 'long' })
-      const dayNumber = date.getDate().toString()
-      const monthName = date.toLocaleDateString('ar-SA', { month: 'long' })
-      
-      const day: Day = {
-        date: date.toISOString().split('T')[0],
-        isWeekend,
-        slotsAvailable: Math.floor(Math.random() * 10),
-        slots: [],
-        isToday,
-        isTomorrow,
-        weekday,
-        dayNumber,
-        monthName
-      }
-      
-      days.push(day)
     }
     
-    return days
-  }
-  
-  const days = generateNextDays(10)
-
-  useEffect(() => {
-    fetchSlots()
-  }, [selectedDate])
-
-  const fetchSlots = async () => {
-    try {
-      setLoading(true)
-      const fieldId = '1'
-      
-      const dateStr = selectedDate.toISOString().split('T')[0]
-      const res = await fetch(`/api/fields/${fieldId}/slots?date=${dateStr}`)
-      
-      if (!res.ok) {
-        throw new Error('Failed to fetch slots')
+    return new NextResponse(
+      'NEXTAUTH_SECRET is missing. Add to .env.local:\n' +
+      'NEXTAUTH_SECRET=$(openssl rand -base64 32)',
+      { 
+        status: 500,
+        headers: { 'Content-Type': 'text/plain' }
       }
-      
-      const data = await res.json()
-      setSlots(data.slots || [])
-      setField(data.field || null)
-    } catch (error) {
-      console.error('Error fetching slots:', error)
-      setSlots([])
-      setField(null)
-    } finally {
-      setLoading(false)
-    }
+    )
   }
-
-  const handleSelectDate = (date: Date) => {
-    setSelectedDate(date)
+  
+  // 2️⃣ تجاهل الملفات الثابتة
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/api/_next') ||
+    pathname.includes('.') ||
+    pathname === '/favicon.ico'
+  ) {
+    return NextResponse.next()
   }
-
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">حجز الملاعب</h1>
-        <p className="text-gray-600 mt-2">اختر الوقت المناسب وحجز ملاعبك المفضلة</p>
-      </header>
-
-      <div className="bg-white rounded-2xl shadow-lg p-6">
-        {field && (
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold mb-2">{field.name}</h2>
-            <p className="text-gray-600">{field.description}</p>
-            <div className="flex items-center gap-4 mt-3">
-              <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">
-                {field.pricePerHour} ج.م/ساعة
-              </span>
-              <span className="text-gray-600">
-                مواعيد العمل: {field.openingTime} - {field.closingTime}
-              </span>
-            </div>
-          </div>
-        )}
-
-        <DaySelector
-          days={days}
-          selectedDate={selectedDate}
-          onSelectDate={handleSelectDate}
-        />
-
-        {loading ? (
-          <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="mt-4 text-gray-600">جاري تحميل المواعيد...</p>
-          </div>
-        ) : (
-          <SlotGrid
-            slots={slots}
-            fieldId={field?.id || ''}
-            fieldName={field?.name || ''}
-            userId={session?.user?.id}
-          />
-        )}
-      </div>
-
-      <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded-xl border">
-          <h4 className="font-bold mb-2">🚀 حجز فوري</h4>
-          <p className="text-sm text-gray-600">احجز وادفع مباشرة للمواعيد بعد 24 ساعة</p>
-        </div>
-        
-        <div className="bg-white p-4 rounded-xl border">
-          <h4 className="font-bold mb-2">⏰ تأكيد يدوي</h4>
-          <p className="text-sm text-gray-600">المواعيد القريبة تحتاج تأكيد من الإدارة</p>
-        </div>
-        
-        <div className="bg-white p-4 rounded-xl border">
-          <h4 className="font-bold mb-2">🔒 قفل آمن</h4>
-          <p className="text-sm text-gray-600">الموعد يبقى مقفول لك 5 دقائق لإتمام الحجز</p>
-        </div>
-      </div>
-    </div>
+  
+  // 3️⃣ الحصول على token
+  const token = await getToken({ 
+    req: request, 
+    secret: process.env.NEXTAUTH_SECRET
+  })
+  
+  // 4️⃣ المسارات العامة
+  const publicPaths = ['/', '/login', '/register', '/about', '/contact']
+  const isPublicPath = publicPaths.some(path => 
+    pathname === path || pathname.startsWith('/api/auth')
   )
+  
+  // 5️⃣ المسارات المحمية
+  const isProtectedPath = pathname.startsWith('/dashboard')
+  
+  // السماح للمسارات العامة
+  if (isPublicPath) {
+    // إذا كان المستخدم مسجل ويحاول الوصول لـ /login أو /register
+    if (token && (pathname === '/login' || pathname === '/register')) {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+    return NextResponse.next()
+  }
+  
+  // حماية المسارات المحمية
+  if (isProtectedPath) {
+    if (!token) {
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('redirect', pathname)
+      return NextResponse.redirect(loginUrl)
+    }
+    
+    return NextResponse.next()
+  }
+  
+  // السماح بالباقي
+  return NextResponse.next()
 }
-// app/(dashboard)/(player)/layout.tsx
-import { redirect } from 'next/navigation'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/infrastructure/auth/auth-options'
 
-export default async function PlayerLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  const session = await getServerSession(authOptions)
-  
-  // إذا لم يكن مسجل
-  if (!session?.user) {
-    redirect('/login?redirect=/dashboard/player')
-  }
-  
-  // إذا كان مسجل ولكن ليس لاعب
-  if (session.user.role !== 'PLAYER') {
-    redirect('/dashboard')
-  }
-  
-  return <div className="min-h-screen bg-gray-50">{children}</div>
+export const config = {
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|api/health).*)',
+  ],
 }
